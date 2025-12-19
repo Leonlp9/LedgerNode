@@ -182,47 +182,109 @@ const PrivateModule = {
             return;
         }
 
-        // Balance Line Chart
-        const ctxBalance = document.getElementById('chart-balance').getContext('2d');
-        this.charts.balance = new Chart(ctxBalance, {
-            type: 'line',
-            data: {
-                labels: [], // Monate
-                datasets: [{
-                    label: 'Kontostand',
-                    data: [],
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59,130,246,0.1)',
-                    tension: 0.2,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: false }
-                }
+        // Falls bereits Chart-Instanzen existieren, diese zuerst zerstören
+        try {
+            if (this.charts.balance && typeof this.charts.balance.destroy === 'function') {
+                this.charts.balance.destroy();
+                this.charts.balance = null;
             }
-        });
+        } catch (e) {
+            console.warn('Fehler beim Zerstören des balance-Charts', e);
+        }
+
+        try {
+            if (this.charts.expensesCategories && typeof this.charts.expensesCategories.destroy === 'function') {
+                this.charts.expensesCategories.destroy();
+                this.charts.expensesCategories = null;
+            }
+        } catch (e) {
+            console.warn('Fehler beim Zerstören des expensesCategories-Charts', e);
+        }
+
+        // Balance Line Chart
+        const canvasBalance = document.getElementById('chart-balance');
+        if (canvasBalance && canvasBalance.getContext) {
+            // Zusätzlich: falls Chart.js eine bereits registrierte Chart-Instanz für dieses Canvas kennt, zerstören
+            try {
+                if (typeof Chart.getChart === 'function') {
+                    const existing = Chart.getChart(canvasBalance);
+                    if (existing && typeof existing.destroy === 'function') {
+                        existing.destroy();
+                    }
+                } else if (canvasBalance._chartInstance && typeof canvasBalance._chartInstance.destroy === 'function') {
+                    // Fallback für ältere Chart.js-Versionen
+                    canvasBalance._chartInstance.destroy();
+                }
+            } catch (e) {
+                console.warn('Fehler beim Zerstören einer vorhandenen Chart-Instanz auf #chart-balance', e);
+            }
+
+            const ctxBalance = canvasBalance.getContext('2d');
+            this.charts.balance = new Chart(ctxBalance, {
+                type: 'line',
+                data: {
+                    labels: [], // Monate
+                    datasets: [{
+                        label: 'Kontostand',
+                        data: [],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59,130,246,0.1)',
+                        tension: 0.2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: false }
+                    }
+                }
+            });
+
+            // Für Debugging: referenz auf canvas speichern (kann bei älteren Versionen nützlich sein)
+            try { canvasBalance._chartInstance = this.charts.balance; } catch (e) { /* ignore */ }
+        } else {
+            console.warn('Canvas #chart-balance nicht gefunden oder unterstützt kein getContext');
+        }
 
         // Expenses by Category Doughnut
-        const ctxExp = document.getElementById('chart-expenses-categories').getContext('2d');
-        this.charts.expensesCategories = new Chart(ctxExp, {
-            type: 'doughnut',
-            data: {
-                labels: [],
-                datasets: [{
-                    data: [],
-                    backgroundColor: [],
-                    hoverOffset: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
+        const canvasExp = document.getElementById('chart-expenses-categories');
+        if (canvasExp && canvasExp.getContext) {
+            try {
+                if (typeof Chart.getChart === 'function') {
+                    const existing = Chart.getChart(canvasExp);
+                    if (existing && typeof existing.destroy === 'function') {
+                        existing.destroy();
+                    }
+                } else if (canvasExp._chartInstance && typeof canvasExp._chartInstance.destroy === 'function') {
+                    canvasExp._chartInstance.destroy();
+                }
+            } catch (e) {
+                console.warn('Fehler beim Zerstören einer vorhandenen Chart-Instanz auf #chart-expenses-categories', e);
             }
-        });
+
+            const ctxExp = canvasExp.getContext('2d');
+            this.charts.expensesCategories = new Chart(ctxExp, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [],
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            try { canvasExp._chartInstance = this.charts.expensesCategories; } catch (e) { /* ignore */ }
+        } else {
+            console.warn('Canvas #chart-expenses-categories nicht gefunden oder unterstützt kein getContext');
+        }
     },
 
     async updateCharts() {
