@@ -1,16 +1,18 @@
 <div class="module-content">
-    <div class="module-header">
-        <h2>Gemeinsame Buchhaltung</h2>
-        <p class="subtitle">Zentral verwaltete Finanzen</p>
-        <?php if (\App\Core\Config::isClient()): ?>
-            <div class="sync-status" id="sync-status">
-                <span class="status-indicator"></span>
-                <span>Verbunden mit Server</span>
-            </div>
-        <?php endif; ?>
-    </div>
+    <!-- Tab: Dashboard -->
+    <div class="tab-content" id="shared-tab-dashboard">
+        <div class="module-header">
+            <h2>Dashboard</h2>
+            <p class="subtitle">Zentral verwaltete Finanzen</p>
+            <?php if (\App\Core\Config::isClient()): ?>
+                <div class="sync-status" id="sync-status">
+                    <span class="status-indicator"></span>
+                    <span>Verbunden mit Server</span>
+                </div>
+            <?php endif; ?>
+        </div>
 
-    <!-- Dashboard Cards -->
+        <!-- Dashboard Cards -->
     <div class="dashboard-grid">
         <div class="card">
             <div class="card-header">
@@ -48,11 +50,8 @@
 
     <!-- Aktionen -->
     <div class="actions-bar">
-        <button class="btn btn-primary" onclick="SharedModule.showAddTransaction()">
+        <button class="btn btn-primary" onclick="SharedModule.showAddTransactionWithTab()">
             ➕ Neue Transaktion
-        </button>
-        <button class="btn btn-secondary" onclick="SharedModule.showAccounts()">
-            📁 Konten verwalten
         </button>
         <?php if (\App\Core\Config::isClient()): ?>
             <button class="btn btn-info" onclick="SharedModule.syncWithServer()">
@@ -61,22 +60,55 @@
         <?php endif; ?>
     </div>
 
-    <!-- Gemeinsame Konten -->
+    <!-- Gemeinsame Konten (Preview) -->
     <div class="card">
         <div class="card-header">
             <h3>Gemeinsame Konten</h3>
+            <button class="btn btn-small" onclick="App.switchTab('shared', 'accounts')">
+                Alle verwalten →
+            </button>
         </div>
         <div class="card-body">
-            <div id="shared-accounts-list" class="accounts-grid">
+            <div id="shared-accounts-preview" class="accounts-grid">
                 <!-- Wird dynamisch gefüllt -->
             </div>
         </div>
     </div>
 
-    <!-- Transaktionsliste -->
+    <!-- Transaktionsliste (Preview) -->
     <div class="card">
         <div class="card-header">
             <h3>Letzte Transaktionen</h3>
+            <button class="btn btn-small" onclick="App.switchTab('shared', 'transactions')">
+                Alle anzeigen →
+            </button>
+        </div>
+        <div class="card-body">
+            <div id="shared-transactions-preview" class="transactions-list">
+                <!-- Wird dynamisch gefüllt -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab: Transaktionen -->
+<div class="tab-content" id="shared-tab-transactions" style="display: none;">
+    <div class="module-header">
+        <h2>Transaktionen</h2>
+        <p class="subtitle">Alle gemeinsamen Transaktionen</p>
+    </div>
+
+    <!-- Aktionen -->
+    <div class="actions-bar">
+        <button class="btn btn-primary" onclick="SharedModule.showAddTransaction()">
+            ➕ Neue Transaktion
+        </button>
+    </div>
+
+    <!-- Transaktionsliste -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Alle Transaktionen</h3>
             <button class="btn btn-small" onclick="SharedModule.loadTransactions()">
                 🔄 Aktualisieren
             </button>
@@ -86,6 +118,42 @@
                 <!-- Wird dynamisch gefüllt -->
                 <div class="empty-state">
                     <p>Noch keine gemeinsamen Transaktionen vorhanden</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab: Konten verwalten -->
+<div class="tab-content" id="shared-tab-accounts" style="display: none;">
+    <div class="module-header">
+        <h2>Konten verwalten</h2>
+        <p class="subtitle">Verwalte gemeinsame Konten</p>
+    </div>
+
+    <!-- Aktionen -->
+    <div class="actions-bar">
+        <button class="btn btn-primary" onclick="SharedModule.showAddAccount()">
+            ➕ Neues Konto
+        </button>
+    </div>
+
+    <!-- Kontenliste -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Gemeinsame Konten</h3>
+            <button class="btn btn-small" onclick="SharedModule.loadAccountsManagement()">
+                🔄 Aktualisieren
+            </button>
+        </div>
+        <div class="card-body">
+            <div id="shared-accounts-management" class="accounts-management-list">
+                <!-- Wird dynamisch gefüllt -->
+                <div class="empty-state">
+                    <p>Noch keine Konten vorhanden</p>
+                    <button class="btn btn-primary" onclick="SharedModule.showAddAccount()">
+                        Erstes Konto erstellen
+                    </button>
                 </div>
             </div>
         </div>
@@ -157,10 +225,11 @@
 <div id="shared-account-modal" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Neues gemeinsames Konto</h3>
+            <h3 id="shared-account-modal-title">Neues gemeinsames Konto</h3>
             <button class="modal-close" onclick="SharedModule.closeAccountModal()">&times;</button>
         </div>
         <form id="shared-account-form" onsubmit="SharedModule.submitAccount(event)">
+            <input type="hidden" id="shared-acc-id" name="id">
             <div class="form-group">
                 <label for="shared-acc-name">Kontoname</label>
                 <input type="text" 
@@ -168,15 +237,6 @@
                        name="name" 
                        placeholder="z.B. Haushaltskasse"
                        required>
-            </div>
-
-            <div class="form-group">
-                <label for="shared-acc-type">Kontotyp</label>
-                <select id="shared-acc-type" name="type" required>
-                    <option value="general">Allgemein</option>
-                    <option value="savings">Sparkonto</option>
-                    <option value="project">Projekt</option>
-                </select>
             </div>
 
             <div class="modal-footer">
@@ -205,8 +265,10 @@ const SharedModule = {
         }
         
         await this.loadStats();
-        await this.loadAccounts();
+        await this.loadAccountsForSelect();
+        await this.loadAccountsPreview();
         await this.loadTransactions();
+        await this.loadTransactionsPreview();
         
         // Setze heutiges Datum als Standard
         document.getElementById('shared-tx-date').valueAsDate = new Date();
@@ -250,9 +312,9 @@ const SharedModule = {
         }
     },
 
-    async loadAccounts() {
-        const container = document.getElementById('shared-accounts-list');
-        const select = document.getElementById('shared-tx-account');
+    async loadAccountsPreview() {
+        const container = document.getElementById('shared-accounts-preview');
+        if (!container) return;
         
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
@@ -263,16 +325,15 @@ const SharedModule = {
                 container.innerHTML = `
                     <div class="empty-state">
                         <p>Noch keine gemeinsamen Konten vorhanden</p>
-                        <button class="btn btn-primary" onclick="SharedModule.showAccounts()">
-                            Erstes Konto erstellen
-                        </button>
                     </div>
                 `;
                 return;
             }
 
-            // Accounts Grid
-            const html = accounts.map(acc => `
+            // Show only first 4 accounts for preview
+            const previewAccounts = accounts.slice(0, 4);
+
+            const html = previewAccounts.map(acc => `
                 <div class="account-card">
                     <div class="account-name">${this.escapeHtml(acc.name)}</div>
                     <div class="account-balance">${this.formatCurrency(acc.balance || 0)}</div>
@@ -283,6 +344,27 @@ const SharedModule = {
             `).join('');
 
             container.innerHTML = html;
+        } catch (error) {
+            console.error('Fehler beim Laden der Konten:', error);
+            container.innerHTML = `
+                <div class="error-state">
+                    <p>Fehler beim Laden der Konten</p>
+                </div>
+            `;
+        }
+    },
+
+    async loadAccountsForSelect() {
+        const select = document.getElementById('shared-tx-account');
+        if (!select) return;
+
+        try {
+            const accounts = await API.getShared('getSharedAccounts');
+            
+            if (!accounts || accounts.length === 0) {
+                select.innerHTML = '<option value="">Keine Konten verfügbar</option>';
+                return;
+            }
 
             // Select-Optionen
             select.innerHTML = accounts.map(acc => 
@@ -291,9 +373,48 @@ const SharedModule = {
 
         } catch (error) {
             console.error('Fehler beim Laden der Konten:', error);
+            select.innerHTML = '<option value="">Fehler beim Laden</option>';
+        }
+    },
+
+    async loadTransactionsPreview() {
+        const container = document.getElementById('shared-transactions-preview');
+        if (!container) return;
+        
+        container.innerHTML = '<div class="loading">Lädt...</div>';
+
+        try {
+            const transactions = await API.getShared('getSharedTransactions', { limit: 5 });
+            
+            if (!transactions || transactions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Noch keine gemeinsamen Transaktionen vorhanden</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = transactions.map(tx => `
+                <div class="transaction-item ${tx.type}">
+                    <div class="transaction-info">
+                        <div class="transaction-description">${this.escapeHtml(tx.description)}</div>
+                        <div class="transaction-meta">
+                            ${this.escapeHtml(tx.account_name || 'Unbekannt')} • ${this.formatDate(tx.date)}
+                        </div>
+                    </div>
+                    <div class="transaction-amount ${tx.type}">
+                        ${tx.type === 'income' ? '+' : '-'}${this.formatCurrency(tx.amount)}
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Fehler beim Laden der Transaktionen:', error);
             container.innerHTML = `
                 <div class="error-state">
-                    <p>Fehler beim Laden der Konten</p>
+                    <p>Fehler beim Laden der Transaktionen</p>
                 </div>
             `;
         }
@@ -375,6 +496,7 @@ const SharedModule = {
                 this.closeModal();
                 await this.loadStats();
                 await this.loadTransactions();
+                await this.loadTransactionsPreview();
             }
         } catch (error) {
             App.showToast('Fehler beim Speichern', 'error');
@@ -391,14 +513,96 @@ const SharedModule = {
                 App.showToast('Transaktion gelöscht', 'success');
                 await this.loadStats();
                 await this.loadTransactions();
+                await this.loadTransactionsPreview();
             }
         } catch (error) {
             App.showToast('Fehler beim Löschen', 'error');
         }
     },
 
-    showAccounts() {
+    showAddTransactionWithTab() {
+        // Wechsel zum Transaktionen-Tab und öffne dann das Modal
+        App.switchTab('shared', 'transactions');
+        // Use requestAnimationFrame for more reliable timing
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => this.showAddTransaction());
+        });
+    },
+
+    async loadAccountsManagement() {
+        const container = document.getElementById('shared-accounts-management');
+        container.innerHTML = '<div class="loading">Lädt...</div>';
+
+        try {
+            const accounts = await API.getShared('getSharedAccounts');
+            
+            if (!accounts || accounts.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Noch keine Konten vorhanden</p>
+                        <button class="btn btn-primary" onclick="SharedModule.showAddAccount()">
+                            Erstes Konto erstellen
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = accounts.map(acc => `
+                <div class="account-manage-item">
+                    <div class="account-manage-info">
+                        <div class="account-manage-name">${this.escapeHtml(acc.name)}</div>
+                        <div class="account-manage-meta">
+                            ${acc.transaction_count || 0} Transaktionen • Saldo: ${this.formatCurrency(acc.balance || 0)}
+                        </div>
+                    </div>
+                    <div class="account-manage-actions">
+                        <button class="btn btn-small btn-secondary" data-account-id="${acc.id}" onclick="SharedModule.editAccountById(this.dataset.accountId)">
+                            ✏️ Bearbeiten
+                        </button>
+                        <button class="btn btn-small btn-danger" onclick="SharedModule.deleteAccount(${acc.id})">
+                            🗑️ Löschen
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Fehler beim Laden der Konten:', error);
+            container.innerHTML = `
+                <div class="error-state">
+                    <p>Fehler beim Laden der Konten</p>
+                </div>
+            `;
+        }
+    },
+
+    showAddAccount() {
+        document.getElementById('shared-account-modal-title').textContent = 'Neues gemeinsames Konto';
+        document.getElementById('shared-acc-id').value = '';
+        document.getElementById('shared-acc-name').value = '';
         document.getElementById('shared-account-modal').style.display = 'flex';
+    },
+
+    editAccount(id, name) {
+        document.getElementById('shared-account-modal-title').textContent = 'Konto bearbeiten';
+        document.getElementById('shared-acc-id').value = id;
+        document.getElementById('shared-acc-name').value = name;
+        document.getElementById('shared-account-modal').style.display = 'flex';
+    },
+
+    async editAccountById(id) {
+        // Fetch account details from the list
+        const accounts = await API.getShared('getSharedAccounts');
+        const account = accounts.find(acc => acc.id === Number(id));
+        if (account) {
+            this.editAccount(id, account.name);
+        }
+    },
+
+    showAccounts() {
+        this.showAddAccount();
     },
 
     closeAccountModal() {
@@ -412,17 +616,46 @@ const SharedModule = {
         const form = event.target;
         const formData = new FormData(form);
         const data = Object.fromEntries(formData);
+        
+        const id = data.id;
 
         try {
-            const result = await API.postShared('createSharedAccount', data);
+            let result;
+            if (id) {
+                // Update existing account
+                result = await API.postShared('updateSharedAccount', data);
+            } else {
+                // Create new account
+                result = await API.postShared('createSharedAccount', data);
+            }
             
             if (result) {
-                App.showToast('Konto erstellt', 'success');
+                App.showToast(id ? 'Konto aktualisiert' : 'Konto erstellt', 'success');
                 this.closeAccountModal();
-                await this.loadAccounts();
+                await this.loadAccountsForSelect();
+                await this.loadAccountsManagement();
+                await this.loadAccountsPreview();
             }
         } catch (error) {
-            App.showToast('Fehler beim Erstellen', 'error');
+            App.showToast('Fehler beim Speichern', 'error');
+        }
+    },
+
+    async deleteAccount(id) {
+        if (!await App.confirm('Konto wirklich löschen? Alle zugehörigen Transaktionen werden ebenfalls gelöscht.')) return;
+
+        try {
+            const result = await API.postShared('deleteSharedAccount', { id });
+            
+            if (result) {
+                App.showToast('Konto gelöscht', 'success');
+                await this.loadAccountsForSelect();
+                await this.loadAccountsManagement();
+                await this.loadAccountsPreview();
+                await this.loadStats();
+            }
+        } catch (error) {
+            App.showToast('Fehler beim Löschen', 'error');
         }
     },
 
@@ -431,8 +664,10 @@ const SharedModule = {
         
         await Promise.all([
             this.loadStats(),
-            this.loadAccounts(),
-            this.loadTransactions()
+            this.loadAccountsForSelect(),
+            this.loadAccountsPreview(),
+            this.loadTransactions(),
+            this.loadTransactionsPreview()
         ]);
         
         App.showToast('Synchronisierung abgeschlossen', 'success');
