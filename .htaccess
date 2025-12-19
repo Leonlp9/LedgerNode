@@ -33,7 +33,8 @@
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     
     # Content-Security-Policy (anpassen nach Bedarf)
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';"
+    # Erlaube Verbindungen (fetch/XHR/websocket) zur externen API-Domain tryusfnr.de
+    Header always set Content-Security-Policy "default-src 'self'; connect-src 'self' https://tryusfnr.de; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';"
 </IfModule>
 
 # PHP-Einstellungen

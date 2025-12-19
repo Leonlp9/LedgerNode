@@ -37,6 +37,8 @@ class Security
      * 1. Authorization Header (Bearer Token)
      * 2. X-API-Key Header
      * 3. POST-Parameter 'api_key'
+     * 4. JSON-Body 'api_key' (wenn Content-Type: application/json)
+     * 5. Query-Parameter 'api_key'
      */
     public static function extractApiKey(): ?string
     {
@@ -52,9 +54,23 @@ class Security
             return $apiKeyHeader;
         }
 
-        // 3. POST-Parameter
-        if (isset($_POST['api_key'])) {
+        // 3. POST-Parameter (Form-POST)
+        if (isset($_POST['api_key']) && !empty($_POST['api_key'])) {
             return $_POST['api_key'];
+        }
+
+        // 4. JSON-Body (Fetch/JS sendet häufig JSON -> PHP füllt $_POST nicht)
+        $rawInput = file_get_contents('php://input');
+        if (!empty($rawInput)) {
+            $jsonInput = json_decode($rawInput, true);
+            if (is_array($jsonInput) && isset($jsonInput['api_key']) && !empty($jsonInput['api_key'])) {
+                return $jsonInput['api_key'];
+            }
+        }
+
+        // 5. Query-Parameter
+        if (isset($_GET['api_key']) && !empty($_GET['api_key'])) {
+            return $_GET['api_key'];
         }
 
         return null;
@@ -62,22 +78,52 @@ class Security
 
     /**
      * Holt einen HTTP-Header (case-insensitive)
+     *
+     * Diese Funktion versucht mehrere Varianten, da Webserver (Apache, Nginx, IIS, FastCGI)
+     * Header unterschiedlich in $_SERVER oder über getallheaders()/apache_request_headers()
+     * bereitstellen. Wir prüfen mehrere Kandidaten wie HTTP_<NAME>, REDIRECT_HTTP_<NAME>
+     * und nutzen getallheaders()/apache_request_headers() als Fallback.
      */
     private static function getHeader(string $name): ?string
     {
-        $name = strtoupper(str_replace('-', '_', $name));
-        
-        // Apache/NGINX Format
-        if (isset($_SERVER["HTTP_{$name}"])) {
-            return $_SERVER["HTTP_{$name}"];
+        // Normalisiere Namen
+        $normalized = str_replace('-', '_', $name);
+        $upper = strtoupper($normalized);
+
+        $candidates = [
+            "HTTP_{$upper}",
+            $upper,
+            "REDIRECT_HTTP_{$upper}",
+            // manche SAPI liefern AUTHORIZATION ohne HTTP_ prefix
+            'AUTHORIZATION'
+        ];
+
+        // Prüfe $_SERVER-Varianten
+        foreach ($candidates as $cand) {
+            if (isset($_SERVER[$cand]) && $_SERVER[$cand] !== '') {
+                return $_SERVER[$cand];
+            }
         }
 
-        // Alternative Schreibweise
+        // Fallback: getallheaders() / apache_request_headers() (case-insensitive)
         if (function_exists('getallheaders')) {
             $headers = getallheaders();
-            foreach ($headers as $key => $value) {
-                if (strtoupper($key) === $name) {
-                    return $value;
+            if (is_array($headers)) {
+                foreach ($headers as $key => $value) {
+                    if (strcasecmp($key, $name) === 0 || strcasecmp(str_replace('_', '-', $key), $name) === 0) {
+                        return $value;
+                    }
+                }
+            }
+        }
+
+        if (function_exists('apache_request_headers')) {
+            $headers = apache_request_headers();
+            if (is_array($headers)) {
+                foreach ($headers as $key => $value) {
+                    if (strcasecmp($key, $name) === 0) {
+                        return $value;
+                    }
                 }
             }
         }
