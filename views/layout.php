@@ -91,15 +91,19 @@ $assetVersion = time();
     <div id="update-modal" class="modal" style="display:none;">
         <div class="modal-backdrop"></div>
         <div class="modal-content">
-            <h3>Update verfügbar</h3>
-            <div id="update-modal-body">
-                <p id="update-status">Prüfe auf Updates...</p>
-                <ul id="update-commits" style="max-height:200px;overflow:auto;margin:8px 0;padding-left:16px;"></ul>
+            <div class="modal-header">
+                <h3>Update verfügbar</h3>
+                <button id="update-close-btn" class="modal-close" aria-label="Schließen">×</button>
             </div>
-            <div class="modal-actions">
-                <button id="update-check-btn" class="btn">Auf Updates prüfen</button>
+
+            <div class="modal-body">
+                <p id="update-status">Prüfe auf Updates...</p>
+                <ul id="update-commits" class="update-commit-list"></ul>
+            </div>
+
+            <div class="modal-footer">
+                <button id="update-check-btn" class="btn btn-secondary">Auf Updates prüfen</button>
                 <button id="update-install-btn" class="btn btn-primary">Update installieren</button>
-                <button id="update-close-btn" class="btn">Schließen</button>
             </div>
         </div>
     </div>

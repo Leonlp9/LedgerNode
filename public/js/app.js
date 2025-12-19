@@ -297,8 +297,10 @@ const Updater = {
                     li.textContent = c;
                     ul.appendChild(li);
                 });
-                // Immer Modal zeigen, wenn Updates vorhanden (auch für automatische Prüfungen)
-                this.showModal();
+                // Immer Modal zeigen, wenn Updates vorhanden.
+                // Wenn die Prüfung automatisch lief (showModal === false), dann ist dies ein "autoDetected"-Fall
+                // showModal expects autoDetected boolean
+                this.showModal(!showModal);
                 App.showToast('Update verfügbar', 'info');
             } else {
                 // Kein Update
@@ -344,15 +346,31 @@ const Updater = {
         }
     },
 
-    showModal() {
+    showModal(autoDetected = false) {
         const modal = document.getElementById('update-modal');
         if (!modal) return;
+
+        // Sichtbarkeit des 'Auf Updates prüfen'-Buttons steuern
+        const checkBtn = document.getElementById('update-check-btn');
+        if (checkBtn) {
+            if (autoDetected) {
+                checkBtn.style.display = 'none';
+            } else {
+                checkBtn.style.display = '';
+            }
+        }
+
         modal.style.display = 'block';
     },
 
     hideModal() {
         const modal = document.getElementById('update-modal');
         if (!modal) return;
+
+        // Stelle sicher, dass der Check-Button wieder sichtbar ist, wenn Modal geschlossen
+        const checkBtn = document.getElementById('update-check-btn');
+        if (checkBtn) checkBtn.style.display = '';
+
         modal.style.display = 'none';
     }
 };
