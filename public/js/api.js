@@ -24,6 +24,24 @@ const API = {
 
         const config = { ...defaultOptions, ...options };
 
+        // Wenn der globale CLIENT_API_KEY gesetzt ist und die Ziel-URL auf das API-Endpoint zeigt,
+        // füge automatisch den X-API-Key Header hinzu. Dadurch funktionieren auch direkte
+        // GET-Aufrufe an /api/endpoint.php?action=... aus dem Browser.
+        try {
+            const urlStr = (typeof url === 'string') ? url : (url instanceof URL ? url.toString() : '');
+            if (typeof window !== 'undefined' && window.CLIENT_API_KEY) {
+                if (urlStr.includes('/api/endpoint.php') || (typeof window.SERVER_API_URL !== 'undefined' && urlStr.startsWith(window.SERVER_API_URL))) {
+                    config.headers = config.headers || {};
+                    // Do not overwrite if caller set its own X-API-Key
+                    if (!config.headers['X-API-Key'] && !config.headers['x-api-key']) {
+                        config.headers['X-API-Key'] = window.CLIENT_API_KEY;
+                    }
+                }
+            }
+        } catch (e) {
+            // ignore errors here — header addition is best-effort for local dev
+        }
+
         // FormData? Dann Content-Type entfernen (wird automatisch gesetzt)
         if (config.body instanceof FormData) {
             delete config.headers['Content-Type'];

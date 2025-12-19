@@ -12,14 +12,40 @@ use App\Api\Server;
 use App\Core\Config;
 use App\Core\Database;
 
-// CORS-Headers (falls erforderlich)
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: X-API-Key, Content-Type, Authorization');
+// CORS: dynamische Allowlist (für Produktion bitte in Konfiguration auslagern)
+$allowedOrigins = [
+    'http://localhost',
+    'http://localhost:3000',
+    'http://127.0.0.1',
+    'http://127.0.0.1:8000'
+];
+$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+if ($origin && in_array($origin, $allowedOrigins, true)) {
+    // Setze Origin exakt (nicht '*') — wichtig wenn Credentials verwendet werden
+    header('Access-Control-Allow-Origin: ' . $origin);
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 
-// Preflight-Request behandeln
+    // Erlaube typische Header; wenn dein Client spezielle Header sendet, ergänze diese
+    $allowedHeaders = 'X-API-Key, Content-Type, Authorization';
+    // Falls ein Preflight spezielle Request-Headers anfragt, nimm sie mit auf (sicherer für Browser-Clients)
+    if (!empty($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {
+        $allowedHeaders = $allowedHeaders . ', ' . $_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'];
+    }
+    header('Access-Control-Allow-Headers: ' . $allowedHeaders);
+
+    // Wichtige Caching-Anweisung: Antwort kann je nach Origin variieren
+    header('Vary: Origin');
+
+    // Falls der Client Cookies / Credentials sendet, aktiviere dies (TODO: nur aktivieren wenn benötigt)
+    // header('Access-Control-Allow-Credentials: true');
+} else {
+    // Kein erlaubter Origin — sende keine CORS-Header (Browser blockiert dann den Request)
+}
+
+// Preflight-Request (OPTIONS) vor weiterer Logik beantworten
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+    // Preflights benötigen normalerweise keinen Body; 204 ist passend
+    http_response_code(204);
     exit;
 }
 

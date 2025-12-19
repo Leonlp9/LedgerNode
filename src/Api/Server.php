@@ -29,10 +29,7 @@ class Server
      */
     public function handleRequest(): void
     {
-        // Authentifizierung
-        Security::authenticateApiRequest();
-
-        // Hole Action aus Request
+        // Hole Action aus Request (vor Authentifizierung, damit public-Checks wie 'health' funktionieren)
         $action = $_POST['action'] ?? $_GET['action'] ?? null;
 
         if (empty($action)) {
@@ -45,6 +42,20 @@ class Server
         if (!method_exists($this, $method)) {
             $this->sendError("Unbekannte Action: {$action}", 404);
         }
+
+        // Wenn es sich um den Health-Check handelt, führe ihn OHNE Authentifizierung aus
+        if (strtolower($action) === 'health') {
+            try {
+                $result = $this->$method();
+                $this->sendSuccess($result);
+            } catch (\Exception $e) {
+                $this->sendError($e->getMessage(), 500);
+            }
+            return;
+        }
+
+        // Authentifizierung (für alle anderen Actions)
+        Security::authenticateApiRequest();
 
         try {
             $result = $this->$method();
