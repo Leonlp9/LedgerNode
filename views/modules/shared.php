@@ -265,7 +265,7 @@ const SharedModule = {
         }
         
         await this.loadStats();
-        await this.loadAccounts();
+        await this.loadAccountsForSelect();
         await this.loadAccountsPreview();
         await this.loadTransactions();
         await this.loadTransactionsPreview();
@@ -312,55 +312,6 @@ const SharedModule = {
         }
     },
 
-    async loadAccounts() {
-        const container = document.getElementById('shared-accounts-list');
-        const select = document.getElementById('shared-tx-account');
-        
-        container.innerHTML = '<div class="loading">Lädt...</div>';
-
-        try {
-            const accounts = await API.getShared('getSharedAccounts');
-            
-            if (!accounts || accounts.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <p>Noch keine gemeinsamen Konten vorhanden</p>
-                        <button class="btn btn-primary" onclick="SharedModule.showAccounts()">
-                            Erstes Konto erstellen
-                        </button>
-                    </div>
-                `;
-                return;
-            }
-
-            // Accounts Grid
-            const html = accounts.map(acc => `
-                <div class="account-card">
-                    <div class="account-name">${this.escapeHtml(acc.name)}</div>
-                    <div class="account-balance">${this.formatCurrency(acc.balance || 0)}</div>
-                    <div class="account-meta">
-                        ${acc.transaction_count || 0} Transaktionen
-                    </div>
-                </div>
-            `).join('');
-
-            container.innerHTML = html;
-
-            // Select-Optionen
-            select.innerHTML = accounts.map(acc => 
-                `<option value="${acc.id}">${this.escapeHtml(acc.name)}</option>`
-            ).join('');
-
-        } catch (error) {
-            console.error('Fehler beim Laden der Konten:', error);
-            container.innerHTML = `
-                <div class="error-state">
-                    <p>Fehler beim Laden der Konten</p>
-                </div>
-            `;
-        }
-    },
-
     async loadAccountsPreview() {
         const container = document.getElementById('shared-accounts-preview');
         if (!container) return;
@@ -403,7 +354,7 @@ const SharedModule = {
         }
     },
 
-    async loadAccounts() {
+    async loadAccountsForSelect() {
         const select = document.getElementById('shared-tx-account');
         if (!select) return;
 
@@ -681,8 +632,9 @@ const SharedModule = {
             if (result) {
                 App.showToast(id ? 'Konto aktualisiert' : 'Konto erstellt', 'success');
                 this.closeAccountModal();
-                await this.loadAccounts();
+                await this.loadAccountsForSelect();
                 await this.loadAccountsManagement();
+                await this.loadAccountsPreview();
             }
         } catch (error) {
             App.showToast('Fehler beim Speichern', 'error');
@@ -697,8 +649,9 @@ const SharedModule = {
             
             if (result) {
                 App.showToast('Konto gelöscht', 'success');
-                await this.loadAccounts();
+                await this.loadAccountsForSelect();
                 await this.loadAccountsManagement();
+                await this.loadAccountsPreview();
                 await this.loadStats();
             }
         } catch (error) {
@@ -711,8 +664,10 @@ const SharedModule = {
         
         await Promise.all([
             this.loadStats(),
-            this.loadAccounts(),
-            this.loadTransactions()
+            this.loadAccountsForSelect(),
+            this.loadAccountsPreview(),
+            this.loadTransactions(),
+            this.loadTransactionsPreview()
         ]);
         
         App.showToast('Synchronisierung abgeschlossen', 'success');
