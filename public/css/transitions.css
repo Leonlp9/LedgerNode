@@ -1,0 +1,398 @@
+/**
+ * Transition & Animation Styles
+ * 
+ * Weiche Übergänge und Animationen für:
+ * - Modul-Wechsel
+ * - Page Transitions
+ * - Element-Animationen
+ */
+
+/* ==========================================
+   FADE ANIMATIONS
+   ========================================== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
+
+/* Module Fade Transitions */
+.module.fade-in {
+    animation: fadeIn 300ms ease-out forwards;
+}
+
+.module.fade-out {
+    animation: fadeOut 300ms ease-in forwards;
+}
+
+/* ==========================================
+   SLIDE ANIMATIONS
+   ========================================== */
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==========================================
+   SCALE ANIMATIONS
+   ========================================== */
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes scaleOut {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+}
+
+/* ==========================================
+   TOAST ANIMATIONS
+   ========================================== */
+.toast-enter {
+    animation: slideInRight 300ms ease-out;
+}
+
+.toast-exit {
+    animation: slideInRight 300ms ease-in reverse;
+}
+
+/* ==========================================
+   MODAL ANIMATIONS
+   ========================================== */
+.modal {
+    animation: fadeIn 200ms ease-out;
+}
+
+.modal-content {
+    animation: scaleIn 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ==========================================
+   BUTTON HOVER EFFECTS
+   ========================================== */
+.btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* ==========================================
+   CARD ANIMATIONS
+   ========================================== */
+.card {
+    animation: fadeIn 400ms ease-out;
+    animation-fill-mode: both;
+}
+
+.dashboard-grid .card:nth-child(1) { animation-delay: 0ms; }
+.dashboard-grid .card:nth-child(2) { animation-delay: 100ms; }
+.dashboard-grid .card:nth-child(3) { animation-delay: 200ms; }
+.dashboard-grid .card:nth-child(4) { animation-delay: 300ms; }
+
+/* ==========================================
+   TRANSACTION ITEM ANIMATIONS
+   ========================================== */
+.transaction-item {
+    animation: slideInUp 300ms ease-out;
+    animation-fill-mode: both;
+}
+
+.transactions-list .transaction-item:nth-child(1) { animation-delay: 0ms; }
+.transactions-list .transaction-item:nth-child(2) { animation-delay: 50ms; }
+.transactions-list .transaction-item:nth-child(3) { animation-delay: 100ms; }
+.transactions-list .transaction-item:nth-child(4) { animation-delay: 150ms; }
+.transactions-list .transaction-item:nth-child(5) { animation-delay: 200ms; }
+
+/* ==========================================
+   LOADING SPINNER
+   ========================================== */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+/* ==========================================
+   PULSE ANIMATION
+   ========================================== */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(0.95);
+    }
+}
+
+.pulse {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* ==========================================
+   SKELETON LOADING
+   ========================================== */
+@keyframes shimmer {
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+}
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--gray-200) 0%,
+        var(--gray-100) 50%,
+        var(--gray-200) 100%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite;
+}
+
+/* ==========================================
+   BOUNCE ANIMATION
+   ========================================== */
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
+.bounce {
+    animation: bounce 1s ease-in-out infinite;
+}
+
+/* ==========================================
+   SHAKE ANIMATION (für Fehler)
+   ========================================== */
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-5px);
+    }
+    20%, 40%, 60%, 80% {
+        transform: translateX(5px);
+    }
+}
+
+.shake {
+    animation: shake 0.5s ease-in-out;
+}
+
+/* ==========================================
+   GLOW EFFECT
+   ========================================== */
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+    }
+}
+
+.glow {
+    animation: glow 2s ease-in-out infinite;
+}
+
+/* ==========================================
+   PAGE TRANSITION
+   ========================================== */
+.page-transition-enter {
+    animation: fadeIn 400ms ease-out;
+}
+
+.page-transition-exit {
+    animation: fadeOut 400ms ease-in;
+}
+
+/* ==========================================
+   STAGGER ANIMATIONS (für Listen)
+   ========================================== */
+@keyframes staggerIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.stagger-item {
+    animation: staggerIn 400ms ease-out;
+    animation-fill-mode: both;
+}
+
+/* Stagger Delays für bis zu 20 Items */
+.stagger-item:nth-child(1) { animation-delay: 0ms; }
+.stagger-item:nth-child(2) { animation-delay: 50ms; }
+.stagger-item:nth-child(3) { animation-delay: 100ms; }
+.stagger-item:nth-child(4) { animation-delay: 150ms; }
+.stagger-item:nth-child(5) { animation-delay: 200ms; }
+.stagger-item:nth-child(6) { animation-delay: 250ms; }
+.stagger-item:nth-child(7) { animation-delay: 300ms; }
+.stagger-item:nth-child(8) { animation-delay: 350ms; }
+.stagger-item:nth-child(9) { animation-delay: 400ms; }
+.stagger-item:nth-child(10) { animation-delay: 450ms; }
+
+/* ==========================================
+   HOVER TRANSITIONS
+   ========================================== */
+.hover-lift {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+}
+
+.hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.hover-scale {
+    transition: transform 200ms ease-out;
+}
+
+.hover-scale:hover {
+    transform: scale(1.05);
+}
+
+/* ==========================================
+   FOCUS TRANSITIONS
+   ========================================== */
+.focus-ring {
+    transition: box-shadow 200ms ease-out;
+}
+
+.focus-ring:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* ==========================================
+   SMOOTH SCROLL
+   ========================================== */
+html {
+    scroll-behavior: smooth;
+}
+
+/* ==========================================
+   REDUCED MOTION (Accessibility)
+   ========================================== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    html {
+        scroll-behavior: auto;
+    }
+}

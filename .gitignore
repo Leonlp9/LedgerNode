@@ -1,0 +1,127 @@
+# ==========================================
+# Git Ignore für verteiltes Buchhaltungssystem
+# ==========================================
+
+# ==========================================
+# WICHTIG: Konfiguration & Credentials
+# ==========================================
+config.php
+.env
+*.key
+*.pem
+
+# ==========================================
+# Datenbanken
+# ==========================================
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+database/local.db
+*.sql.gz
+*.sql.zip
+
+# ==========================================
+# Logs
+# ==========================================
+*.log
+logs/
+storage/logs/
+var/log/
+
+# ==========================================
+# Temporäre Dateien
+# ==========================================
+tmp/
+temp/
+cache/
+*.tmp
+*.cache
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# PHP
+# ==========================================
+vendor/
+!vendor/autoload.php
+composer.phar
+composer.lock
+
+# ==========================================
+# Backup-Dateien
+# ==========================================
+*.bak
+*.backup
+*.old
+*~
+*.swp
+*.swo
+
+# ==========================================
+# IDE & Editor
+# ==========================================
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+nbproject/
+
+# ==========================================
+# OS-spezifisch
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ==========================================
+# Node (falls später verwendet)
+# ==========================================
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# ==========================================
+# Build-Artefakte
+# ==========================================
+dist/
+build/
+public/assets/compiled/
+
+# ==========================================
+# Testing
+# ==========================================
+coverage/
+.phpunit.result.cache
+tests/_output/
+
+# ==========================================
+# Uploads
+# ==========================================
+uploads/*
+!uploads/.gitkeep
+storage/uploads/*
+!storage/uploads/.gitkeep
+
+# ==========================================
+# Security
+# ==========================================
+.htpasswd
+auth.json
+oauth-*.json

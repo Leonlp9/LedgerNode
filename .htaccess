@@ -1,0 +1,100 @@
+# Apache-Konfiguration für verteiltes Buchhaltungssystem
+
+# Rewrite Engine aktivieren
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # API-Requests direkt durchleiten
+    RewriteCond %{REQUEST_URI} ^/api/
+    RewriteRule ^ - [L]
+
+    # Statische Assets direkt durchleiten
+    RewriteCond %{REQUEST_URI} ^/public/
+    RewriteRule ^ - [L]
+
+    # Alle anderen Requests zu index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Sicherheits-Headers
+<IfModule mod_headers.c>
+    # Verhindere Clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+    
+    # XSS-Schutz
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # Content-Type-Sniffing verhindern
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # Referrer-Policy
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Content-Security-Policy (anpassen nach Bedarf)
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';"
+</IfModule>
+
+# PHP-Einstellungen
+<IfModule mod_php.c>
+    # Fehleranzeige deaktivieren (Produktion)
+    php_flag display_errors Off
+    php_flag display_startup_errors Off
+    
+    # Error-Logging aktivieren
+    php_flag log_errors On
+    
+    # Upload-Limits
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 30
+    php_value max_input_time 30
+    
+    # Session-Sicherheit
+    php_flag session.cookie_httponly On
+    php_flag session.use_strict_mode On
+</IfModule>
+
+# Verzeichnis-Listing verhindern
+Options -Indexes
+
+# Zugriff auf sensible Dateien verhindern
+<FilesMatch "^(config\.php|\.env|\.git.*|composer\.(json|lock)|\.htaccess)$">
+    Require all denied
+</FilesMatch>
+
+# Cache-Control für statische Assets
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Bilder
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    
+    # CSS und JavaScript
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    
+    # Fonts
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# Kompression aktivieren
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# MIME-Types
+<IfModule mod_mime.c>
+    AddType application/javascript .js
+    AddType text/css .css
+    AddType image/svg+xml .svg
+    AddType font/woff .woff
+    AddType font/woff2 .woff2
+</IfModule>
