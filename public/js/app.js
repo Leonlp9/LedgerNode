@@ -208,6 +208,10 @@ const App = {
      * Confirm-Dialog
      */
     async confirm(message) {
+        if (window.CustomDialog && typeof window.CustomDialog.confirm === 'function') {
+            return await window.CustomDialog.confirm(message);
+        }
+        // Fallback to native confirm if custom dialog not available
         return window.confirm(message);
     },
 
@@ -322,7 +326,14 @@ const Updater = {
 
     async installUpdates() {
         try {
-            if (!confirm('Möchten Sie die Updates jetzt installieren? Dies kann die Anwendung verändern.')) return;
+            // Use CustomDialog (async) if available
+            let ok = true;
+            if (window.CustomDialog && typeof window.CustomDialog.confirm === 'function') {
+                ok = await window.CustomDialog.confirm('Möchten Sie die Updates jetzt installieren? Dies kann die Anwendung verändern.');
+            } else {
+                ok = confirm('Möchten Sie die Updates jetzt installieren? Dies kann die Anwendung verändern.');
+            }
+            if (!ok) return;
 
             document.getElementById('update-status').textContent = 'Installiere Updates...';
             const isServer = (typeof window.IS_SERVER !== 'undefined' && window.IS_SERVER === true);

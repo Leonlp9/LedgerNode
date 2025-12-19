@@ -382,7 +382,7 @@ const SharedModule = {
     },
 
     async deleteTransaction(id) {
-        if (!confirm('Transaktion wirklich löschen?')) return;
+        if (!await App.confirm('Transaktion wirklich löschen?')) return;
 
         try {
             const result = await API.postShared('deleteTransaction', { id });

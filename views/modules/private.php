@@ -451,7 +451,7 @@ const PrivateModule = {
     },
 
     async deleteTransaction(id) {
-        if (!confirm('Transaktion wirklich löschen?')) return;
+        if (!await App.confirm('Transaktion wirklich löschen?')) return;
 
         const result = await API.delete(`/api/private/transactions/${id}`);
         

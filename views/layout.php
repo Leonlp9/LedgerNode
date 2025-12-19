@@ -14,6 +14,7 @@ $assetVersion = time();
 
     <link rel="stylesheet" href="<?= htmlspecialchars($basePath . '/public/css/main.css') ?>?v=<?= $assetVersion ?>">
     <link rel="stylesheet" href="<?= htmlspecialchars($basePath . '/public/css/transitions.css') ?>?v=<?= $assetVersion ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars($basePath . '/public/css/custom-dialog.css') ?>?v=<?= $assetVersion ?>">
 
     <!-- Chart.js (CDN) - wird vor den Modulen geladen, damit Inline-Skripte Chart nutzen können -->
     <script src="<?= htmlspecialchars($basePath . '/public/js/chart.js') ?>?v=<?= $assetVersion ?>"></script>
@@ -123,6 +124,7 @@ $assetVersion = time();
         <?php endif; ?>
     </script>
     <script src="<?= htmlspecialchars($basePath . '/public/js/api.js') ?>?v=<?= $assetVersion ?>"></script>
+    <script src="<?= htmlspecialchars($basePath . '/public/js/custom-dialog.js') ?>?v=<?= $assetVersion ?>"></script>
     <script src="<?= htmlspecialchars($basePath . '/public/js/app.js') ?>?v=<?= $assetVersion ?>"></script>
 
     <?php if (isset($additionalScripts)): ?>
