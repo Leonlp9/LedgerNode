@@ -127,7 +127,7 @@ const App = {
         // Fade-In new module
         newModuleEl.classList.remove('fade-in');
 
-        // Modul initialisieren
+        // Setze aktuellen Modul-Namen vor weiteren Aktionen
         this.currentModule = moduleName;
         
         // Update module switcher buttons
@@ -138,13 +138,16 @@ const App = {
             }
         });
         
+        // WICHTIG: Modul zuerst initialisieren, damit alle asynchronen Inhalte geladen sind
+        // bevor wir Tabs rendern / anzeigen. Das behebt Fälle, in denen das Modul zwar sichtbar
+        // ist, aber noch keine Daten geladen wurden.
+        await this.initModule(moduleName);
+
         // Update tabs for the new module
         this.updateTabs();
         
         // Switch to the appropriate tab for this module
-        this.switchTab(moduleName, this.currentTab[moduleName], false);
-        
-        await this.initModule(moduleName);
+        await this.switchTab(moduleName, this.currentTab[moduleName], false);
 
         // URL-Hash aktualisieren
         if (updateHash) {
@@ -152,6 +155,19 @@ const App = {
         }
 
         this.isTransitioning = false;
+    },
+
+    /**
+     * Register tabs for a module at runtime
+     * @param {string} moduleName
+     * @param {Array} tabsArray
+     */
+    registerTabs(moduleName, tabsArray) {
+        if (!moduleName || !Array.isArray(tabsArray)) return;
+        this.tabs[moduleName] = tabsArray;
+        if (this.currentModule === moduleName) {
+            this.updateTabs();
+        }
     },
 
     /**
@@ -180,7 +196,7 @@ const App = {
      * @param {string} moduleName - Name of the module (private|shared)
      * @param {string} tabId - ID of the tab to switch to
      */
-    switchTab(moduleName, tabId) {
+    async switchTab(moduleName, tabId) {
         if (moduleName !== this.currentModule) {
             console.warn('Cannot switch tab for inactive module:', moduleName);
             return;
@@ -200,9 +216,35 @@ const App = {
         if (selectedTab) {
             selectedTab.style.display = 'block';
             this.currentTab[moduleName] = tabId;
-            
+
             // Update active state in navigation
             this.updateTabs();
+
+            // Load data automatically for certain tabs so user doesn't need to click "Aktualisieren"
+            try {
+                if (moduleName === 'private' && typeof PrivateModule !== 'undefined') {
+                    if (tabId === 'accounts') {
+                        // Load both select and management lists
+                        try { await PrivateModule.loadAccounts(); } catch (e) { console.warn('PrivateModule.loadAccounts failed', e); }
+                        try { await PrivateModule.loadAccountsManagement(); } catch (e) { console.warn('PrivateModule.loadAccountsManagement failed', e); }
+                    } else if (tabId === 'transactions') {
+                        try { await PrivateModule.loadTransactions(); } catch (e) { console.warn('PrivateModule.loadTransactions failed', e); }
+                    }
+                }
+
+                if (moduleName === 'shared' && typeof SharedModule !== 'undefined') {
+                    if (tabId === 'accounts') {
+                        // load select, management and preview
+                        try { await SharedModule.loadAccountsForSelect(); } catch (e) { console.warn('SharedModule.loadAccountsForSelect failed', e); }
+                        try { await SharedModule.loadAccountsManagement(); } catch (e) { console.warn('SharedModule.loadAccountsManagement failed', e); }
+                        try { await SharedModule.loadAccountsPreview(); } catch (e) { console.warn('SharedModule.loadAccountsPreview failed', e); }
+                    } else if (tabId === 'transactions') {
+                        try { await SharedModule.loadTransactions(); } catch (e) { console.warn('SharedModule.loadTransactions failed', e); }
+                    }
+                }
+            } catch (e) {
+                console.error('Error while auto-loading tab data', e);
+            }
         }
     },
 

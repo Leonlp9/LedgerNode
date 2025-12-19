@@ -260,6 +260,15 @@ const PrivateModule = {
 
     async init() {
         console.log('Private Module initialisiert');
+        // Registriere Tabs speziell für dieses Modul (stellt sicher, dass App die richtigen Tabs zeigt)
+        if (typeof App !== 'undefined' && typeof App.registerTabs === 'function') {
+            App.registerTabs('private', [
+                { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+                { id: 'transactions', label: 'Transaktionen', icon: '💳' },
+                { id: 'accounts', label: 'Konten', icon: '📁' }
+            ]);
+        }
+
         await this.loadStats();
         await this.loadTransactions();
         await this.loadTransactionsPreview();
@@ -552,8 +561,14 @@ const PrivateModule = {
 
     async loadAccounts() {
         const select = document.getElementById('private-tx-account');
-        const accounts = await API.get('/api/private/accounts');
-        
+        let accounts = await API.get('/api/private/accounts');
+
+        // Defensive normalization: handle cases where API returns an object/map instead of an array
+        if (!Array.isArray(accounts)) {
+            console.debug('PrivateModule.loadAccounts: normalizing accounts response', accounts);
+            accounts = Array.isArray(accounts?.data) ? accounts.data : (accounts ? Object.values(accounts) : []);
+        }
+
         if (accounts) {
             select.innerHTML = accounts.map(acc =>
                 `<option value="${acc.id}">${this.escapeHtml(acc.name)}</option>`
@@ -622,19 +637,35 @@ const PrivateModule = {
 
     showAddTransactionWithTab() {
         // Wechsel zum Transaktionen-Tab und öffne dann das Modal
-        App.switchTab('private', 'transactions');
-        // Use requestAnimationFrame for more reliable timing
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => this.showAddTransaction());
-        });
+        // Async-safe: wechsle Tab, lade die Transaktionen und öffne dann das Modal
+        (async () => {
+            // ensure active module is correct
+            if (App.currentModule !== 'private') {
+                await App.switchModule('private');
+            }
+            App.switchTab('private', 'transactions');
+            try {
+                await this.loadTransactions();
+            } catch (e) {
+                console.warn('loadTransactions failed before opening modal', e);
+            }
+            this.showAddTransaction();
+        })();
     },
 
     async loadAccountsManagement() {
         const container = document.getElementById('private-accounts-management');
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
-        const accounts = await API.get('/api/private/accounts');
-        
+        let accounts = await API.get('/api/private/accounts');
+        console.debug('PrivateModule.loadAccountsManagement -> received', accounts);
+
+        // Defensive normalization: accept { data: [...] } or object maps
+        if (!Array.isArray(accounts)) {
+            console.debug('PrivateModule.loadAccountsManagement: normalizing accounts response', accounts);
+            accounts = Array.isArray(accounts?.data) ? accounts.data : (accounts ? Object.values(accounts) : []);
+        }
+
         if (!accounts || accounts.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
@@ -685,7 +716,11 @@ const PrivateModule = {
 
     async editAccountById(id) {
         // Fetch account details from the list
-        const accounts = await API.get('/api/private/accounts');
+        let accounts = await API.get('/api/private/accounts');
+        if (!Array.isArray(accounts)) {
+            console.debug('PrivateModule.editAccountById: normalizing accounts response', accounts);
+            accounts = Array.isArray(accounts?.data) ? accounts.data : (accounts ? Object.values(accounts) : []);
+        }
         const account = accounts.find(acc => acc.id === Number(id));
         if (account) {
             this.editAccount(id, account.name);
@@ -767,3 +802,5 @@ function _startPrivateModuleWhenReady() {
 
 _startPrivateModuleWhenReady();
 </script>
+
+</div>

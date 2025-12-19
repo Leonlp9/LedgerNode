@@ -259,6 +259,15 @@ const SharedModule = {
     async init() {
         console.log('Shared Module initialisiert');
         
+        // Registriere Tabs speziell für dieses Modul (stellt sicher, dass App die richtigen Tabs zeigt)
+        if (typeof App !== 'undefined' && typeof App.registerTabs === 'function') {
+            App.registerTabs('shared', [
+                { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+                { id: 'transactions', label: 'Transaktionen', icon: '💳' },
+                { id: 'accounts', label: 'Konten', icon: '📁' }
+            ]);
+        }
+
         // Prüfe Server-Verbindung bei Clients
         if (!this.isServer) {
             await this.checkServerConnection();
@@ -319,8 +328,15 @@ const SharedModule = {
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
         try {
-            const accounts = await API.getShared('getSharedAccounts');
-            
+            let accounts = await API.getShared('getSharedAccounts');
+            console.debug('SharedModule.loadAccountsPreview -> received', accounts);
+
+            // Defensive normalization: accept { data: [...] } or object maps
+            if (!Array.isArray(accounts)) {
+                console.debug('SharedModule.loadAccountsPreview: normalizing accounts response', accounts);
+                accounts = Array.isArray(accounts?.data) ? accounts.data : (accounts ? Object.values(accounts) : []);
+            }
+
             if (!accounts || accounts.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
@@ -359,8 +375,14 @@ const SharedModule = {
         if (!select) return;
 
         try {
-            const accounts = await API.getShared('getSharedAccounts');
-            
+            let accounts = await API.getShared('getSharedAccounts');
+            console.debug('SharedModule.loadAccountsForSelect -> received', accounts);
+
+            if (!Array.isArray(accounts)) {
+                console.debug('SharedModule.loadAccountsForSelect: normalizing accounts response', accounts);
+                accounts = Array.isArray(accounts?.data) ? accounts.data : (accounts ? Object.values(accounts) : []);
+            }
+
             if (!accounts || accounts.length === 0) {
                 select.innerHTML = '<option value="">Keine Konten verfügbar</option>';
                 return;
@@ -522,11 +544,20 @@ const SharedModule = {
 
     showAddTransactionWithTab() {
         // Wechsel zum Transaktionen-Tab und öffne dann das Modal
-        App.switchTab('shared', 'transactions');
-        // Use requestAnimationFrame for more reliable timing
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => this.showAddTransaction());
-        });
+        // Async-safe: wechsle Tab, lade die Transaktionen und öffne dann das Modal
+        (async () => {
+            // ensure active module is correct
+            if (App.currentModule !== 'shared') {
+                await App.switchModule('shared');
+            }
+            App.switchTab('shared', 'transactions');
+            try {
+                await this.loadTransactions();
+            } catch (e) {
+                console.warn('loadTransactions failed before opening modal', e);
+            }
+            this.showAddTransaction();
+        })();
     },
 
     async loadAccountsManagement() {
@@ -534,8 +565,14 @@ const SharedModule = {
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
         try {
-            const accounts = await API.getShared('getSharedAccounts');
-            
+            let accounts = await API.getShared('getSharedAccounts');
+            console.debug('SharedModule.loadAccountsManagement -> received', accounts);
+
+            if (!Array.isArray(accounts)) {
+                console.debug('SharedModule.loadAccountsManagement: normalizing accounts response', accounts);
+                accounts = Array.isArray(accounts?.data) ? accounts.data : (accounts ? Object.values(accounts) : []);
+            }
+
             if (!accounts || accounts.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
@@ -594,7 +631,11 @@ const SharedModule = {
 
     async editAccountById(id) {
         // Fetch account details from the list
-        const accounts = await API.getShared('getSharedAccounts');
+        let accounts = await API.getShared('getSharedAccounts');
+        if (!Array.isArray(accounts)) {
+            console.debug('SharedModule.editAccountById: normalizing accounts response', accounts);
+            accounts = Array.isArray(accounts?.data) ? accounts.data : (accounts ? Object.values(accounts) : []);
+        }
         const account = accounts.find(acc => acc.id === Number(id));
         if (account) {
             this.editAccount(id, account.name);
