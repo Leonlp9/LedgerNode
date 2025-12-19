@@ -337,7 +337,13 @@ const Updater = {
 
             document.getElementById('update-status').textContent = 'Update erfolgreich installiert.';
             App.showToast('Update installiert', 'success');
-            return res;
+            // Kurzes Delay, dann Seite neu laden, damit die neue Version sichtbar ist und das Modal geschlossen wird
+            setTimeout(() => {
+                try { Updater.hideModal(); } catch(e) {}
+                // reload the page so the new files take effect
+                window.location.reload();
+            }, 800);
+             return res;
         } catch (err) {
             console.error('Fehler beim Installieren der Updates', err);
             document.getElementById('update-status').textContent = 'Fehler beim Installieren der Updates.';
