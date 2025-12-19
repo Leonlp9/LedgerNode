@@ -94,7 +94,7 @@ const App = {
 
         // Fade-Out current module
         currentModuleEl.classList.add('fade-out');
-        
+
         await this.wait(300); // Warte auf Animation
 
         // Wechsel

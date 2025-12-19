@@ -417,7 +417,7 @@ const PrivateModule = {
         const accounts = await API.get('/api/private/accounts');
         
         if (accounts) {
-            select.innerHTML = accounts.map(acc => 
+            select.innerHTML = accounts.map(acc =>
                 `<option value="${acc.id}">${this.escapeHtml(acc.name)}</option>`
             ).join('');
         }
