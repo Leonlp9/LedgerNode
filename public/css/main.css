@@ -176,6 +176,7 @@ a:hover {
 .nav {
     flex: 1;
     padding: var(--spacing-lg) 0;
+    overflow-y: auto;
 }
 
 .nav-item {
@@ -213,11 +214,53 @@ a:hover {
     font-size: 0.9375rem;
 }
 
+/* Module Switcher at bottom */
+.module-switcher {
+    display: flex;
+    gap: 0;
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--gray-200);
+    background: var(--gray-50);
+}
+
+.module-switch-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-md) var(--spacing-sm);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.module-switch-btn .nav-icon {
+    font-size: 1.5rem;
+}
+
+.module-switch-btn:hover {
+    background: white;
+    color: var(--primary);
+}
+
+.module-switch-btn.active {
+    background: white;
+    color: var(--primary);
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+}
+
 .sidebar-footer {
-    padding: var(--spacing-lg);
+    padding: var(--spacing-md);
     border-top: 1px solid var(--gray-200);
     text-align: center;
     color: var(--gray-500);
+    font-size: 0.75rem;
 }
 
 /* ==========================================
@@ -254,6 +297,10 @@ a:hover {
 }
 
 .module-content {
+    animation: fadeIn var(--transition-base);
+}
+
+.tab-content {
     animation: fadeIn var(--transition-base);
 }
 
@@ -746,6 +793,61 @@ a:hover {
 .account-meta {
     font-size: 0.875rem;
     color: var(--gray-600);
+}
+
+/* Account Management List */
+.accounts-management-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.account-manage-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg);
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+    transition: all var(--transition-fast);
+}
+
+.account-manage-item:hover {
+    background: white;
+    box-shadow: var(--shadow-md);
+}
+
+.account-manage-info {
+    flex: 1;
+}
+
+.account-manage-name {
+    font-weight: 600;
+    font-size: 1.125rem;
+    color: var(--gray-900);
+    margin-bottom: var(--spacing-xs);
+}
+
+.account-manage-meta {
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+.account-manage-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 /* ==========================================

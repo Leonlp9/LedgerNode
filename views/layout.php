@@ -37,23 +37,20 @@ $assetVersion = time();
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <nav class="nav">
-                <a href="#"
-                   class="nav-item active"
-                   data-module="private"
-                   onclick="App.switchModule('private'); return false;">
-                    <span class="nav-icon">👤</span>
-                    <span class="nav-label">Privat</span>
-                </a>
-
-                <a href="#"
-                   class="nav-item"
-                   data-module="shared"
-                   onclick="App.switchModule('shared'); return false;">
-                    <span class="nav-icon">👥</span>
-                    <span class="nav-label">Gemeinsam</span>
-                </a>
+            <nav class="nav" id="tab-nav">
+                <!-- Tabs werden hier dynamisch eingefügt -->
             </nav>
+
+            <div class="module-switcher">
+                <button class="module-switch-btn active" data-module="private" onclick="App.switchModule('private')">
+                    <span class="nav-icon">👤</span>
+                    <span>Privat</span>
+                </button>
+                <button class="module-switch-btn" data-module="shared" onclick="App.switchModule('shared')">
+                    <span class="nav-icon">👥</span>
+                    <span>Gemeinsam</span>
+                </button>
+            </div>
 
             <div class="sidebar-footer">
                 <small>Version <?= htmlspecialchars(\App\Core\Config::get('APP.version', '1.0.0')) ?></small>

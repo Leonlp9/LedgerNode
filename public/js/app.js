@@ -10,7 +10,25 @@
 
 const App = {
     currentModule: 'private',
+    currentTab: {
+        private: 'dashboard',
+        shared: 'dashboard'
+    },
     isTransitioning: false,
+
+    // Tab definitions for each module
+    tabs: {
+        private: [
+            { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+            { id: 'transactions', label: 'Transaktionen', icon: '💳' },
+            { id: 'accounts', label: 'Konten', icon: '📁' }
+        ],
+        shared: [
+            { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+            { id: 'transactions', label: 'Transaktionen', icon: '💳' },
+            { id: 'accounts', label: 'Konten', icon: '📁' }
+        ]
+    },
 
     /**
      * Initialisierung
@@ -18,6 +36,9 @@ const App = {
     init() {
         console.log('App initialisiert');
         
+        // Initialize tabs for current module
+        this.updateTabs();
+
         // Modul aus URL-Hash laden
         const hash = window.location.hash.substring(1);
         if (hash && ['private', 'shared'].includes(hash)) {
@@ -108,6 +129,21 @@ const App = {
 
         // Modul initialisieren
         this.currentModule = moduleName;
+        
+        // Update module switcher buttons
+        document.querySelectorAll('.module-switch-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.module === moduleName) {
+                btn.classList.add('active');
+            }
+        });
+        
+        // Update tabs for the new module
+        this.updateTabs();
+        
+        // Switch to the appropriate tab for this module
+        this.switchTab(moduleName, this.currentTab[moduleName], false);
+        
         await this.initModule(moduleName);
 
         // URL-Hash aktualisieren
@@ -116,6 +152,59 @@ const App = {
         }
 
         this.isTransitioning = false;
+    },
+
+    /**
+     * Update tab navigation for current module
+     */
+    updateTabs() {
+        const tabNav = document.getElementById('tab-nav');
+        if (!tabNav) return;
+
+        const moduleTabs = this.tabs[this.currentModule] || [];
+        
+        tabNav.innerHTML = moduleTabs.map(tab => `
+            <a href="#" 
+               class="nav-item ${tab.id === this.currentTab[this.currentModule] ? 'active' : ''}" 
+               data-tab="${tab.id}"
+               onclick="App.switchTab('${this.currentModule}', '${tab.id}'); return false;">
+                <span class="nav-icon">${tab.icon}</span>
+                <span class="nav-label">${tab.label}</span>
+            </a>
+        `).join('');
+    },
+
+    /**
+     * Switch to a specific tab within the current module
+     * 
+     * @param {string} moduleName - Name of the module (private|shared)
+     * @param {string} tabId - ID of the tab to switch to
+     * @param {boolean} animate - Whether to animate the transition
+     */
+    switchTab(moduleName, tabId, animate = true) {
+        if (moduleName !== this.currentModule) {
+            console.warn('Cannot switch tab for inactive module:', moduleName);
+            return;
+        }
+
+        // Hide all tabs in the current module
+        const moduleContainer = document.getElementById(`module-${moduleName}`);
+        if (!moduleContainer) return;
+
+        const allTabs = moduleContainer.querySelectorAll('.tab-content');
+        allTabs.forEach(tab => {
+            tab.style.display = 'none';
+        });
+
+        // Show the selected tab
+        const selectedTab = document.getElementById(`${moduleName}-tab-${tabId}`);
+        if (selectedTab) {
+            selectedTab.style.display = 'block';
+            this.currentTab[moduleName] = tabId;
+            
+            // Update active state in navigation
+            this.updateTabs();
+        }
     },
 
     /**
