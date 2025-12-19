@@ -87,8 +87,25 @@ $assetVersion = time();
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
+    <!-- Update-Popup (wird vom App-Updater gesteuert) -->
+    <div id="update-modal" class="modal" style="display:none;">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <h3>Update verfügbar</h3>
+            <div id="update-modal-body">
+                <p id="update-status">Prüfe auf Updates...</p>
+                <ul id="update-commits" style="max-height:200px;overflow:auto;margin:8px 0;padding-left:16px;"></ul>
+            </div>
+            <div class="modal-actions">
+                <button id="update-check-btn" class="btn">Auf Updates prüfen</button>
+                <button id="update-install-btn" class="btn btn-primary">Update installieren</button>
+                <button id="update-close-btn" class="btn">Schließen</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
-    <script>window.APP_BASE = <?= json_encode($basePath) ?>;</script>
+    <script>window.APP_BASE = <?= json_encode($basePath) ?>; window.IS_SERVER = <?= json_encode(\App\Core\Config::isServer()) ?>;</script>
     <script src="<?= htmlspecialchars($basePath . '/public/js/api.js') ?>?v=<?= $assetVersion ?>"></script>
     <script src="<?= htmlspecialchars($basePath . '/public/js/app.js') ?>?v=<?= $assetVersion ?>"></script>
 

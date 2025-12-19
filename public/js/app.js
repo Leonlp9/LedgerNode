@@ -43,6 +43,11 @@ const App = {
             console.error('Unhandled Promise Rejection:', event.reason);
             this.showToast('Ein Fehler ist aufgetreten', 'error');
         });
+
+        // Init Updater (nur wenn server)
+        if (typeof window.IS_SERVER !== 'undefined' && window.IS_SERVER) {
+            Updater.init();
+        }
     },
 
     /**
@@ -234,6 +239,94 @@ const App = {
     scrollToElement(element, offset = 0) {
         const top = element.getBoundingClientRect().top + window.pageYOffset - offset;
         window.scrollTo({ top, behavior: 'smooth' });
+    }
+};
+
+// --- Updater Subsystem -------------------------------------------------
+const Updater = {
+    intervalMs: 1000 * 60 * 5, // 5 Minuten
+    timerId: null,
+    lastResult: null,
+
+    init() {
+        // Buttons
+        const checkBtn = document.getElementById('update-check-btn');
+        const installBtn = document.getElementById('update-install-btn');
+        const closeBtn = document.getElementById('update-close-btn');
+
+        if (checkBtn) checkBtn.addEventListener('click', () => this.checkUpdates(true));
+        if (installBtn) installBtn.addEventListener('click', () => this.installUpdates());
+        if (closeBtn) closeBtn.addEventListener('click', () => this.hideModal());
+
+        // Starte periodische Prüfung
+        this.checkUpdates(false).catch(() => {});
+        this.timerId = setInterval(() => this.checkUpdates(false).catch(() => {}), this.intervalMs);
+    },
+
+    async checkUpdates(showModal = true) {
+        try {
+            document.getElementById('update-status').textContent = 'Prüfe auf Updates...';
+            document.getElementById('update-commits').innerHTML = '';
+
+            const res = await API.postShared('checkUpdates', {});
+            // API.postShared routet über /api/endpoint.php?action=checkUpdates
+
+            this.lastResult = res;
+
+            if (res.updates) {
+                document.getElementById('update-status').textContent = 'Neue Commits vorhanden:';
+                const ul = document.getElementById('update-commits');
+                res.commits.forEach(c => {
+                    const li = document.createElement('li');
+                    li.textContent = c;
+                    ul.appendChild(li);
+                });
+                if (showModal) this.showModal();
+                // kleine Benachrichtigung
+                App.showToast('Update verfügbar', 'info');
+            } else {
+                document.getElementById('update-status').textContent = 'Repository ist auf dem neuesten Stand.';
+                if (showModal) this.showModal();
+            }
+
+            return res;
+        } catch (err) {
+            console.error('Fehler beim Prüfen auf Updates', err);
+            document.getElementById('update-status').textContent = 'Fehler beim Prüfen auf Updates.';
+            if (showModal) this.showModal();
+            App.showToast('Fehler beim Prüfen auf Updates', 'error');
+            throw err;
+        }
+    },
+
+    async installUpdates() {
+        try {
+            if (!confirm('Möchten Sie die Updates jetzt installieren? Dies kann die Anwendung verändern.')) return;
+
+            document.getElementById('update-status').textContent = 'Installiere Updates...';
+            const res = await API.postShared('installUpdates', {});
+
+            document.getElementById('update-status').textContent = 'Update erfolgreich installiert.';
+            App.showToast('Update installiert', 'success');
+            return res;
+        } catch (err) {
+            console.error('Fehler beim Installieren der Updates', err);
+            document.getElementById('update-status').textContent = 'Fehler beim Installieren der Updates.';
+            App.showToast('Fehler beim Installieren des Updates', 'error');
+            throw err;
+        }
+    },
+
+    showModal() {
+        const modal = document.getElementById('update-modal');
+        if (!modal) return;
+        modal.style.display = 'block';
+    },
+
+    hideModal() {
+        const modal = document.getElementById('update-modal');
+        if (!modal) return;
+        modal.style.display = 'none';
     }
 };
 
