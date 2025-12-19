@@ -5,9 +5,8 @@
     RewriteEngine On
     RewriteBase /
 
-    # API-Requests direkt durchleiten
-    RewriteCond %{REQUEST_URI} ^/api/
-    RewriteRule ^ - [L]
+    # Route alle /api/* Requests intern zu api/endpoint.php (Dev/Routing)
+    RewriteRule ^api/(.*)$ api/endpoint.php [QSA,L]
 
     # Statische Assets direkt durchleiten
     RewriteCond %{REQUEST_URI} ^/public/

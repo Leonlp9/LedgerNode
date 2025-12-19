@@ -55,7 +55,7 @@ return [
      * Anwendungs-Einstellungen
      */
     'APP' => [
-        'name' => 'Distributed Accounting',
+        'name' => 'LedgerNode',
         'version' => '1.0.0',
         'timezone' => 'Europe/Berlin',
         'debug' => false,  // Nur in Entwicklung true

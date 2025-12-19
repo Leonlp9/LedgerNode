@@ -10,6 +10,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use App\Api\Server;
 use App\Core\Config;
+use App\Core\Database;
 
 // CORS-Headers (falls erforderlich)
 header('Access-Control-Allow-Origin: *');
@@ -49,6 +50,219 @@ set_exception_handler(function($exception) {
     echo json_encode($response);
     exit;
 });
+
+// Bestimme den Request-Pfad. Erlaube auch Übergabe über ?path=/api/.. (für direkte Aufrufe ohne Rewrite)
+$reqPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+if (isset($_REQUEST['path']) && is_string($_REQUEST['path']) && $_REQUEST['path'] !== '') {
+    // Normalisiere sicherheitshalber
+    $reqPath = $_REQUEST['path'];
+}
+// Entferne optionales App-Base (z.B. /LedgerNode) falls vorhanden
+if (strpos($reqPath, '/api/') === false) {
+    $pathParts = explode('/api/', $reqPath);
+    if (count($pathParts) > 1) {
+        $reqPath = '/api/' . end($pathParts);
+    }
+}
+
+// Behandle einfache private-API Pfade als schnelle Stubs (nur wenn diese Instanz KEIN Server ist)
+if (preg_match('#^/api/private(?:/.*)?$#', $reqPath) && !Config::isServer()) {
+    header('Content-Type: application/json');
+
+    // Hilfsfunktion: JSON-Body parsen falls vorhanden
+    $rawInput = file_get_contents('php://input');
+    $jsonInput = json_decode($rawInput, true);
+    if (!is_array($jsonInput)) {
+        $jsonInput = [];
+    }
+
+    // Instanz der DB
+    try {
+        $db = Database::getInstance();
+    } catch (\Exception $e) {
+        echo json_encode(['success' => false, 'error' => 'Datenbankverbindung fehlgeschlagen']);
+        exit;
+    }
+
+    // /api/private/stats
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && preg_match('#^/api/private/stats$#', $reqPath)) {
+        try {
+            $incomeRow = $db->fetchOne("SELECT COALESCE(SUM(amount), 0) as total FROM private_transactions WHERE type = 'income'");
+            $expensesRow = $db->fetchOne("SELECT COALESCE(SUM(amount), 0) as total FROM private_transactions WHERE type = 'expense'");
+            $initialRow = $db->fetchOne("SELECT COALESCE(SUM(initial_balance), 0) as total FROM private_accounts");
+
+            $income = (float) (isset($incomeRow['total']) ? $incomeRow['total'] : 0);
+            $expenses = (float) (isset($expensesRow['total']) ? $expensesRow['total'] : 0);
+            $initial = (float) (isset($initialRow['total']) ? $initialRow['total'] : 0);
+
+            $balance = $initial + $income - $expenses;
+
+            echo json_encode(['success' => true, 'data' => ['balance' => $balance, 'income' => $income, 'expenses' => $expenses]]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => 'Fehler beim Berechnen der Statistiken']);
+        }
+        exit;
+    }
+
+    // /api/private/transactions (GET)
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && preg_match('#^/api/private/transactions$#', $reqPath)) {
+        $limit = (int) (isset($_GET['limit']) ? $_GET['limit'] : 100);
+        $offset = (int) (isset($_GET['offset']) ? $_GET['offset'] : 0);
+
+        try {
+            $sql = "SELECT t.*, a.name as account_name FROM private_transactions t LEFT JOIN private_accounts a ON t.account_id = a.id ORDER BY t.date DESC, t.created_at DESC LIMIT :limit OFFSET :offset";
+            $rows = $db->fetchAll($sql, [':limit' => $limit, ':offset' => $offset]);
+            echo json_encode(['success' => true, 'data' => $rows]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => true, 'data' => []]);
+        }
+        exit;
+    }
+
+    // /api/private/accounts (GET)
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && preg_match('#^/api/private/accounts$#', $reqPath)) {
+        try {
+            // Verwende Unterabfrage, um den Kontostand pro Konto zu berechnen und GROUP BY-Probleme zu vermeiden
+            $sql = "SELECT a.id, a.name, a.type, a.description, a.initial_balance, a.created_at, a.updated_at, 
+                        (SELECT COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount WHEN t.type = 'expense' THEN -t.amount ELSE 0 END), 0) FROM private_transactions t WHERE t.account_id = a.id) as balance 
+                    FROM private_accounts a 
+                    ORDER BY a.name ASC";
+            $rows = $db->fetchAll($sql);
+            echo json_encode(['success' => true, 'data' => $rows]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => true, 'data' => []]);
+        }
+        exit;
+    }
+
+    // /api/private/transactions (POST) -> erstelle echte Transaktion
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && preg_match('#^/api/private/transactions$#', $reqPath)) {
+        $input = array_merge($_POST, $jsonInput);
+
+        $required = ['account_id', 'amount', 'description', 'date'];
+        foreach ($required as $field) {
+            if (!isset($input[$field]) || $input[$field] === '') {
+                echo json_encode(['success' => false, 'error' => "Pflichtfeld fehlt: {$field}"]);
+                exit;
+            }
+        }
+
+        $accountId = (int) $input['account_id'];
+        $amount = (float) $input['amount'];
+        $description = (string) $input['description'];
+        $date = (string) $input['date'];
+        $type = isset($input['type']) ? $input['type'] : 'expense';
+
+        if (!in_array($type, array('income', 'expense'))) {
+            $type = 'expense';
+        }
+
+        try {
+            $data = [
+                'account_id' => $accountId,
+                'type' => $type,
+                'amount' => $amount,
+                'description' => $description,
+                'date' => $date,
+                'created_at' => date('Y-m-d H:i:s')
+            ];
+
+            $id = $db->insertArray('private_transactions', $data);
+
+            echo json_encode(['success' => true, 'data' => ['id' => $id, 'message' => 'Transaktion erstellt']]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => 'Fehler beim Erstellen der Transaktion']);
+        }
+        exit;
+    }
+
+    // /api/private/transactions/{id} (DELETE)
+    if ($_SERVER['REQUEST_METHOD'] === 'DELETE' && preg_match('#^/api/private/transactions/(\d+)$#', $reqPath, $m)) {
+        $id = (int) $m[1];
+        try {
+            $affected = $db->execute('DELETE FROM private_transactions WHERE id = :id', array(':id' => $id));
+            if ($affected === 0) {
+                echo json_encode(['success' => false, 'error' => 'Transaktion nicht gefunden']);
+            } else {
+                echo json_encode(['success' => true, 'data' => ['message' => 'Transaktion gelöscht']]);
+            }
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => 'Fehler beim Löschen der Transaktion']);
+        }
+        exit;
+    }
+
+    // /api/private/stats/balance_series -> kumulierter Kontostand (letzte 12 Monate)
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && preg_match('#^/api/private/stats/balance_series$#', $reqPath)) {
+        try {
+            // Summe der initial balances
+            $initialRow = $db->fetchOne("SELECT COALESCE(SUM(initial_balance), 0) as total FROM private_accounts");
+            $initial = (float) ($initialRow['total'] ?? 0);
+
+            // Net changes grouped by year/month
+            $rows = $db->fetchAll("SELECT YEAR(`date`) as y, MONTH(`date`) as m, SUM(CASE WHEN `type` = 'income' THEN `amount` WHEN `type` = 'expense' THEN -`amount` ELSE 0 END) as net FROM private_transactions GROUP BY y, m ORDER BY y, m");
+
+            $netMap = [];
+            foreach ($rows as $r) {
+                $key = sprintf('%04d-%02d', $r['y'], $r['m']);
+                $netMap[$key] = (float) $r['net'];
+            }
+
+            // Erzeuge Labels für die letzten 12 Monate (älteste -> neueste)
+            $labels = [];
+            $data = [];
+            $dt = new DateTime();
+            $dt->modify('first day of this month');
+            for ($i = 11; $i >= 0; $i--) {
+                $m = clone $dt;
+                $m->modify("-{$i} months");
+                $labels[] = $m->format('M Y');
+            }
+
+            // Kumulierten Kontostand berechnen
+            $cumulative = $initial;
+            foreach ($labels as $label) {
+                // Label zurück in Year-Month konvertieren
+                $d = DateTime::createFromFormat('M Y', $label);
+                if ($d === false) {
+                    // Fallback: nimm heutiges Datum (sollte eigentlich nicht passieren)
+                    $d = new DateTime();
+                }
+                $key = $d->format('Y-m');
+                $monthlyNet = isset($netMap[$key]) ? $netMap[$key] : 0.0;
+                $cumulative += $monthlyNet;
+                $data[] = round($cumulative, 2);
+            }
+
+            echo json_encode(['success' => true, 'data' => ['labels' => $labels, 'data' => $data]]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => 'Fehler beim Erzeugen der Balance-Serie']);
+        }
+        exit;
+    }
+
+    // /api/private/stats/expenses_by_category -> Summen pro Kategorie
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && preg_match('#^/api/private/stats/expenses_by_category$#', $reqPath)) {
+        try {
+            $sql = "SELECT COALESCE(category, 'Uncategorized') as category, COALESCE(SUM(amount), 0) as total FROM private_transactions WHERE `type` = 'expense' GROUP BY category ORDER BY total DESC";
+            $rows = $db->fetchAll($sql);
+
+            $result = array_map(function($r) {
+                return ['category' => $r['category'], 'amount' => (float) $r['total']];
+            }, $rows ?: []);
+
+            echo json_encode(['success' => true, 'data' => $result]);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => 'Fehler beim Berechnen der Ausgaben nach Kategorie']);
+        }
+        exit;
+    }
+
+    // Wenn kein Match -> 404
+    http_response_code(404);
+    echo json_encode(['success' => false, 'error' => 'Not Found (private-api)']);
+    exit;
+}
 
 try {
     // Prüfe ob dies ein Server ist

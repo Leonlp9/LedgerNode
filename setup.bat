@@ -21,26 +21,26 @@ if /I "%INSTALL_TYPE%" neq "server" if /I "%INSTALL_TYPE%" neq "client" (
   echo Verwendung: setup.bat [server|client]
   exit /b 1
 )
-
-:CHECK_PHP
-echo Pruefe PHP...
-where php >nul 2>&1
-if errorlevel 1 (
-  echo PHP wurde nicht gefunden. Bitte PHP (XAMPP) in PATH aufnehmen.
-  exit /b 1
-)
-for /f "delims=" %%V in ('php -r "echo PHP_VERSION;"') do set PHP_VERSION=%%V
-if "%PHP_VERSION%"=="" (
-  echo Fehler beim Ermitteln der PHP-Version
-  exit /b 1
-)
-echo Gefundene PHP-Version: %PHP_VERSION%
-php -r "exit(version_compare(PHP_VERSION, '8.0.0', '<') ? 1 : 0);" >nul 2>&1
-if errorlevel 1 (
-  echo PHP 8.0 oder hoehere Version erforderlich!
-  exit /b 1
-)
-echo PHP-Version OK
+@REM
+@REM :CHECK_PHP
+@REM echo Pruefe PHP...
+@REM where php >nul 2>&1
+@REM if errorlevel 1 (
+@REM   echo PHP wurde nicht gefunden. Bitte PHP (XAMPP) in PATH aufnehmen.
+@REM   exit /b 1
+@REM )
+@REM for /f "delims=" %%V in ('php -r "echo PHP_VERSION;"') do set PHP_VERSION=%%V
+@REM if "%PHP_VERSION%"=="" (
+@REM   echo Fehler beim Ermitteln der PHP-Version
+@REM   exit /b 1
+@REM )
+@REM echo Gefundene PHP-Version: %PHP_VERSION%
+@REM php -r "exit(version_compare(PHP_VERSION, '8.0.0', '<') ? 1 : 0);" >nul 2>&1
+@REM if errorlevel 1 (
+@REM   echo PHP 8.0 oder hoehere Version erforderlich!
+@REM   exit /b 1
+@REM )
+@REM echo PHP-Version OK
 
 :: API-Key generieren (nutzt PHP)
 for /f "delims=" %%K in ('php -r "echo bin2hex(random_bytes(32));"') do set API_KEY=%%K

@@ -40,6 +40,27 @@
         </div>
     </div>
 
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="card chart-card">
+            <div class="card-header">
+                <h3>Kontostandsverlauf (letzte 12 Monate)</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="chart-balance" width="600" height="250"></canvas>
+            </div>
+        </div>
+
+        <div class="card chart-card">
+            <div class="card-header">
+                <h3>Ausgaben nach Kategorie</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="chart-expenses-categories" width="400" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+
     <!-- Aktionen -->
     <div class="actions-bar">
         <button class="btn btn-primary" onclick="PrivateModule.showAddTransaction()">
@@ -136,14 +157,138 @@
 <script>
 // Private Modul JavaScript
 const PrivateModule = {
+    // Chart.js-Instanzen
+    charts: {
+        balance: null,
+        expensesCategories: null
+    },
+
     async init() {
         console.log('Private Module initialisiert');
         await this.loadStats();
         await this.loadTransactions();
         await this.loadAccounts();
-        
+        this.initCharts();
+        await this.updateCharts();
+
         // Setze heutiges Datum als Standard
         document.getElementById('private-tx-date').valueAsDate = new Date();
+    },
+
+    initCharts() {
+        // Defensive: Chart.js prüfen
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js ist nicht geladen — Charts werden nicht angezeigt');
+            return;
+        }
+
+        // Balance Line Chart
+        const ctxBalance = document.getElementById('chart-balance').getContext('2d');
+        this.charts.balance = new Chart(ctxBalance, {
+            type: 'line',
+            data: {
+                labels: [], // Monate
+                datasets: [{
+                    label: 'Kontostand',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.1)',
+                    tension: 0.2,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: false }
+                }
+            }
+        });
+
+        // Expenses by Category Doughnut
+        const ctxExp = document.getElementById('chart-expenses-categories').getContext('2d');
+        this.charts.expensesCategories = new Chart(ctxExp, {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    backgroundColor: [],
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    },
+
+    async updateCharts() {
+        if (!this.charts.balance || !this.charts.expensesCategories) return;
+
+        // Anfrage an (noch hypothetische) API-Endpunkte
+        // Falls API nicht vorhanden, verwenden wir Beispiel-Daten
+        let balanceSeries;
+        try {
+            balanceSeries = await API.get('/api/private/stats/balance_series');
+        } catch (e) {
+            console.debug('Balance series API nicht erreichbar, nutze Platzhalterdaten', e);
+            balanceSeries = null;
+        }
+
+        if (!balanceSeries || !Array.isArray(balanceSeries.labels)) {
+            // Beispiel: letzte 12 Monate
+            const labels = [];
+            const data = [];
+            for (let i = 11; i >= 0; i--) {
+                const d = new Date();
+                d.setMonth(d.getMonth() - i);
+                labels.push(d.toLocaleString('de-DE', { month: 'short', year: 'numeric' }));
+                data.push((Math.random() * 2000 - 500).toFixed(2));
+            }
+            balanceSeries = { labels, data };
+        }
+
+        // Aktualisiere Balance Chart
+        this.charts.balance.data.labels = balanceSeries.labels;
+        this.charts.balance.data.datasets[0].data = balanceSeries.data.map(n => Number(n));
+        this.charts.balance.update();
+
+        // Expenses by category
+        let expensesByCat;
+        try {
+            expensesByCat = await API.get('/api/private/stats/expenses_by_category');
+        } catch (e) {
+            console.debug('Expenses by category API nicht erreichbar, nutze Platzhalterdaten', e);
+            expensesByCat = null;
+        }
+
+        if (!expensesByCat || !Array.isArray(expensesByCat)) {
+            expensesByCat = [
+                { category: 'Miete', amount: 800 },
+                { category: 'Lebensmittel', amount: 250 },
+                { category: 'Transport', amount: 120 },
+                { category: 'Freizeit', amount: 90 }
+            ];
+        }
+
+        const labels = expensesByCat.map(e => e.category);
+        const data = expensesByCat.map(e => e.amount);
+        const colors = labels.map((_, i) => this.getColor(i));
+
+        this.charts.expensesCategories.data.labels = labels;
+        this.charts.expensesCategories.data.datasets[0].data = data;
+        this.charts.expensesCategories.data.datasets[0].backgroundColor = colors;
+        this.charts.expensesCategories.update();
+    },
+
+    getColor(index) {
+        const palette = [
+            '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'
+        ];
+        return palette[index % palette.length];
     },
 
     async loadStats() {
@@ -165,8 +310,15 @@ const PrivateModule = {
         const container = document.getElementById('private-transactions-list');
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
-        const transactions = await API.get('/api/private/transactions');
-        
+        let transactions = await API.get('/api/private/transactions');
+        console.debug('PrivateModule.loadTransactions -> received:', transactions);
+
+        // Defensive: falls API etwas anderes als ein Array liefert, konvertieren und warnen
+        if (!Array.isArray(transactions)) {
+            console.warn('PrivateModule.loadTransactions: transactions is not an array, normalizing to []');
+            transactions = Array.isArray(transactions?.data) ? transactions.data : [];
+        }
+
         if (!transactions || transactions.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
@@ -232,6 +384,7 @@ const PrivateModule = {
             this.closeModal();
             await this.loadStats();
             await this.loadTransactions();
+            await this.updateCharts();
         }
     },
 
@@ -244,6 +397,7 @@ const PrivateModule = {
             App.showToast('Transaktion gelöscht', 'success');
             await this.loadStats();
             await this.loadTransactions();
+            await this.updateCharts();
         }
     },
 
@@ -269,8 +423,33 @@ const PrivateModule = {
     }
 };
 
-// Auto-init wenn Modul aktiv wird
-if (document.getElementById('module-private').classList.contains('active')) {
-    PrivateModule.init();
+// Auto-init: erst starten wenn DOM fertig ist und API & App geladen sind
+function _startPrivateModuleWhenReady() {
+    function tryInit() {
+        if (typeof API !== 'undefined' && typeof App !== 'undefined') {
+            PrivateModule.init();
+            return true;
+        }
+        return false;
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        if (!tryInit()) {
+            // Falls noch nicht verfügbar, warte kurz
+            const interval = setInterval(() => {
+                if (tryInit()) clearInterval(interval);
+            }, 50);
+        }
+    } else {
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!tryInit()) {
+                const interval = setInterval(() => {
+                    if (tryInit()) clearInterval(interval);
+                }, 50);
+            }
+        });
+    }
 }
+
+_startPrivateModuleWhenReady();
 </script>

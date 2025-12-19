@@ -6,8 +6,8 @@
  */
 
 const API = {
-    // Basis-Konfiguration
-    baseUrl: window.location.origin,
+    // Basis-Konfiguration - nutze window.APP_BASE wenn gesetzt
+    baseUrl: (typeof window.APP_BASE !== 'undefined' && window.APP_BASE) ? (window.location.origin + window.APP_BASE) : window.location.origin,
     timeout: 30000,
 
     /**
@@ -30,6 +30,19 @@ const API = {
         }
 
         try {
+            // Normalize: if caller passed a URL string that points directly to /api/... (and not to endpoint.php),
+            // transparently route it through api/endpoint.php?path=... so it works without mod_rewrite.
+            if (typeof url === 'string') {
+                const asStr = url;
+                if (asStr.includes('/api/') && !asStr.includes('/api/endpoint.php')) {
+                    const idx = asStr.indexOf('/api/');
+                    const path = asStr.substring(idx);
+                    const newUrl = this.baseUrl + '/api/endpoint.php?path=' + encodeURIComponent(path);
+                    console.debug('[API] Rewriting API URL ->', newUrl);
+                    url = newUrl;
+                }
+            }
+
             App.showLoading();
 
             const controller = new AbortController();
@@ -52,7 +65,18 @@ const API = {
                 data = await response.text();
             }
 
-            // Fehlerbehandlung
+            // Wenn API-Wrapper { success: bool, data: ... } genutzt wird, entpacke automatisch
+            if (typeof data === 'object' && data !== null && Object.prototype.hasOwnProperty.call(data, 'success')) {
+                if (data.success === false) {
+                    // Server-seitiger Fehler (nicht erfolgreich)
+                    throw new Error(data.error || data.message || `API Error`);
+                }
+
+                // Erfolg: gib nur das payload zurück
+                return data.data;
+            }
+
+            // HTTP-Fehler (falls Status >=400)
             if (!response.ok) {
                 throw new Error(data.error || data.message || `HTTP ${response.status}`);
             }
@@ -74,14 +98,38 @@ const API = {
     },
 
     /**
+     * Hilfsfunktion: Baue die tatsächliche URL für ein Endpoint
+     * Wenn das Endpoint mit /api/ beginnt, routen wir es über api/endpoint.php?path=...
+     */
+    _buildEndpointUrl(endpoint) {
+        if (typeof endpoint !== 'string') return this.baseUrl;
+
+        if (endpoint.startsWith('/api/')) {
+            // Nutze endpoint.php mit path-Parameter -> funktioniert auch wenn Rewrite nicht aktiv ist
+            return this.baseUrl + '/api/endpoint.php';
+        }
+
+        return this.baseUrl + endpoint;
+    },
+
+    /**
      * GET-Request
      */
     async get(endpoint, params = {}) {
+        if (endpoint.startsWith('/api/')) {
+            const url = new URL(this.baseUrl + '/api/endpoint.php');
+            url.searchParams.append('path', endpoint);
+            Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+            console.debug('[API] GET ->', url.toString());
+            return this.request(url.toString(), { method: 'GET' });
+        }
+
         const url = new URL(this.baseUrl + endpoint);
-        Object.keys(params).forEach(key => 
+        Object.keys(params).forEach(key =>
             url.searchParams.append(key, params[key])
         );
 
+        console.debug('[API] GET ->', url.toString());
         return this.request(url.toString(), {
             method: 'GET'
         });
@@ -91,6 +139,14 @@ const API = {
      * POST-Request
      */
     async post(endpoint, data = {}) {
+        if (endpoint.startsWith('/api/')) {
+            const url = this.baseUrl + '/api/endpoint.php?path=' + encodeURIComponent(endpoint);
+            return this.request(url, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+        }
+
         return this.request(this.baseUrl + endpoint, {
             method: 'POST',
             body: JSON.stringify(data)
@@ -111,6 +167,14 @@ const API = {
      * PUT-Request
      */
     async put(endpoint, data = {}) {
+        if (endpoint.startsWith('/api/')) {
+            const url = this.baseUrl + '/api/endpoint.php?path=' + encodeURIComponent(endpoint);
+            return this.request(url, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        }
+
         return this.request(this.baseUrl + endpoint, {
             method: 'PUT',
             body: JSON.stringify(data)
@@ -121,6 +185,11 @@ const API = {
      * DELETE-Request
      */
     async delete(endpoint) {
+        if (endpoint.startsWith('/api/')) {
+            const url = this.baseUrl + '/api/endpoint.php?path=' + encodeURIComponent(endpoint);
+            return this.request(url, { method: 'DELETE' });
+        }
+
         return this.request(this.baseUrl + endpoint, {
             method: 'DELETE'
         });

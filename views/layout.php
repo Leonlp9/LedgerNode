@@ -1,12 +1,22 @@
+<?php
+$basePath = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+if ($basePath === '.' || $basePath === '/') {
+    $basePath = '';
+}
+$assetVersion = time();
+?>
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($pageTitle ?? 'Buchhaltung') ?></title>
-    
-    <link rel="stylesheet" href="/public/css/main.css">
-    <link rel="stylesheet" href="/public/css/transitions.css">
+    <title><?= htmlspecialchars(isset($pageTitle) ? $pageTitle : 'Buchhaltung') ?></title>
+
+    <link rel="stylesheet" href="<?= htmlspecialchars($basePath . '/public/css/main.css') ?>?v=<?= $assetVersion ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars($basePath . '/public/css/transitions.css') ?>?v=<?= $assetVersion ?>">
+
+    <!-- Chart.js (CDN) - wird vor den Modulen geladen, damit Inline-Skripte Chart nutzen können -->
+    <script src="<?= htmlspecialchars($basePath . '/public/js/chart.js') ?>?v=<?= $assetVersion ?>"></script>
 </head>
 <body>
     <!-- Header -->
@@ -78,9 +88,10 @@
     <div id="toast-container" class="toast-container"></div>
 
     <!-- Scripts -->
-    <script src="/public/js/api.js"></script>
-    <script src="/public/js/app.js"></script>
-    
+    <script>window.APP_BASE = <?= json_encode($basePath) ?>;</script>
+    <script src="<?= htmlspecialchars($basePath . '/public/js/api.js') ?>?v=<?= $assetVersion ?>"></script>
+    <script src="<?= htmlspecialchars($basePath . '/public/js/app.js') ?>?v=<?= $assetVersion ?>"></script>
+
     <?php if (isset($additionalScripts)): ?>
         <?php foreach ($additionalScripts as $script): ?>
             <script src="<?= htmlspecialchars($script) ?>"></script>
