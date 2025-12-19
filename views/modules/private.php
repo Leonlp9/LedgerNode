@@ -584,6 +584,7 @@ const PrivateModule = {
             this.closeModal();
             await this.loadStats();
             await this.loadTransactions();
+            await this.loadTransactionsPreview();
             await this.updateCharts();
         }
     },
@@ -597,6 +598,7 @@ const PrivateModule = {
             App.showToast('Transaktion gelöscht', 'success');
             await this.loadStats();
             await this.loadTransactions();
+            await this.loadTransactionsPreview();
             await this.updateCharts();
         }
     },
@@ -621,7 +623,10 @@ const PrivateModule = {
     showAddTransactionWithTab() {
         // Wechsel zum Transaktionen-Tab und öffne dann das Modal
         App.switchTab('private', 'transactions');
-        setTimeout(() => this.showAddTransaction(), 100);
+        // Use requestAnimationFrame for more reliable timing
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => this.showAddTransaction());
+        });
     },
 
     async loadAccountsManagement() {
@@ -651,7 +656,7 @@ const PrivateModule = {
                     </div>
                 </div>
                 <div class="account-manage-actions">
-                    <button class="btn btn-small btn-secondary" onclick="PrivateModule.editAccount(${acc.id}, '${this.escapeHtml(acc.name).replace(/'/g, "\\'")}')">
+                    <button class="btn btn-small btn-secondary" data-account-id="${acc.id}" onclick="PrivateModule.editAccountById(this.dataset.accountId)">
                         ✏️ Bearbeiten
                     </button>
                     <button class="btn btn-small btn-danger" onclick="PrivateModule.deleteAccount(${acc.id})">
@@ -676,6 +681,15 @@ const PrivateModule = {
         document.getElementById('private-acc-id').value = id;
         document.getElementById('private-acc-name').value = name;
         document.getElementById('private-account-modal').style.display = 'flex';
+    },
+
+    async editAccountById(id) {
+        // Fetch account details from the list
+        const accounts = await API.get('/api/private/accounts');
+        const account = accounts.find(acc => acc.id == id);
+        if (account) {
+            this.editAccount(id, account.name);
+        }
     },
 
     closeAccountModal() {

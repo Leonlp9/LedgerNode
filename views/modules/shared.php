@@ -545,6 +545,7 @@ const SharedModule = {
                 this.closeModal();
                 await this.loadStats();
                 await this.loadTransactions();
+                await this.loadTransactionsPreview();
             }
         } catch (error) {
             App.showToast('Fehler beim Speichern', 'error');
@@ -561,6 +562,7 @@ const SharedModule = {
                 App.showToast('Transaktion gelöscht', 'success');
                 await this.loadStats();
                 await this.loadTransactions();
+                await this.loadTransactionsPreview();
             }
         } catch (error) {
             App.showToast('Fehler beim Löschen', 'error');
@@ -570,7 +572,10 @@ const SharedModule = {
     showAddTransactionWithTab() {
         // Wechsel zum Transaktionen-Tab und öffne dann das Modal
         App.switchTab('shared', 'transactions');
-        setTimeout(() => this.showAddTransaction(), 100);
+        // Use requestAnimationFrame for more reliable timing
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => this.showAddTransaction());
+        });
     },
 
     async loadAccountsManagement() {
@@ -601,7 +606,7 @@ const SharedModule = {
                         </div>
                     </div>
                     <div class="account-manage-actions">
-                        <button class="btn btn-small btn-secondary" onclick="SharedModule.editAccount(${acc.id}, '${this.escapeHtml(acc.name).replace(/'/g, "\\'")}')">
+                        <button class="btn btn-small btn-secondary" data-account-id="${acc.id}" onclick="SharedModule.editAccountById(this.dataset.accountId)">
                             ✏️ Bearbeiten
                         </button>
                         <button class="btn btn-small btn-danger" onclick="SharedModule.deleteAccount(${acc.id})">
@@ -634,6 +639,15 @@ const SharedModule = {
         document.getElementById('shared-acc-id').value = id;
         document.getElementById('shared-acc-name').value = name;
         document.getElementById('shared-account-modal').style.display = 'flex';
+    },
+
+    async editAccountById(id) {
+        // Fetch account details from the list
+        const accounts = await API.getShared('getSharedAccounts');
+        const account = accounts.find(acc => acc.id == id);
+        if (account) {
+            this.editAccount(id, account.name);
+        }
     },
 
     showAccounts() {
