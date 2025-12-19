@@ -105,7 +105,19 @@ $assetVersion = time();
     </div>
 
     <!-- Scripts -->
-    <script>window.APP_BASE = <?= json_encode($basePath) ?>; window.IS_SERVER = <?= json_encode(\App\Core\Config::isServer()) ?>;</script>
+    <script>
+        window.APP_BASE = <?= json_encode($basePath) ?>;
+        window.IS_SERVER = <?= json_encode(\App\Core\Config::isServer()) ?>;
+        // SERVER_API_URL: für Clients in config.php gesetzt (nur relevant wenn dies NICHT der Server ist)
+        window.SERVER_API_URL = <?= json_encode(\App\Core\Config::getApiUrl()) ?>;
+        <?php if (!\App\Core\Config::isServer()): ?>
+            // CLIENT_API_KEY: Wird benötigt, damit der Client API-Requests an den zentralen Server authentifiziert.
+            // JA, der Key muss auf dem Client liegen (config.php). Sei dir bewusst, dass er im Browser sichtbar ist.
+            window.CLIENT_API_KEY = <?= json_encode(\App\Core\Config::getApiKey()) ?>;
+        <?php else: ?>
+            window.CLIENT_API_KEY = null;
+        <?php endif; ?>
+    </script>
     <script src="<?= htmlspecialchars($basePath . '/public/js/api.js') ?>?v=<?= $assetVersion ?>"></script>
     <script src="<?= htmlspecialchars($basePath . '/public/js/app.js') ?>?v=<?= $assetVersion ?>"></script>
 

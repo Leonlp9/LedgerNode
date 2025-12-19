@@ -204,8 +204,34 @@ const API = {
      * oder direkt an lokale API (für Server)
      */
     async requestShared(action, data = {}, method = 'POST') {
+        // Wenn dies ein Client ist und eine zentrale Server-URL konfiguriert ist,
+        // dann rufe die zentrale Server-API auf (z.B. http(s)://server.example.com/api/endpoint.php)
+        const isServer = (typeof window.IS_SERVER !== 'undefined' && window.IS_SERVER === true);
+        const serverUrl = (typeof window.SERVER_API_URL !== 'undefined' && window.SERVER_API_URL) ? window.SERVER_API_URL : null;
+
+        if (!isServer && serverUrl) {
+            // Baue die Ziel-URL (Server). Akzeptiere sowohl API_URL mit als auch ohne trailing /api/endpoint.php
+            let url = serverUrl;
+            if (!/\/api\/endpoint\.php$/i.test(url)) {
+                url = url.replace(/\/$/, '') + '/api/endpoint.php';
+            }
+            if (method === 'GET') {
+                // GET: action + params als query
+                const u = new URL(url);
+                u.searchParams.append('action', action);
+                Object.keys(data || {}).forEach(k => u.searchParams.append(k, data[k]));
+                return this.request(u.toString(), { method: 'GET' });
+            }
+            // POST: sende JSON body { action, ...data }
+            const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+            if (typeof window.CLIENT_API_KEY !== 'undefined' && window.CLIENT_API_KEY) {
+                headers['X-API-Key'] = window.CLIENT_API_KEY;
+            }
+            return this.request(url, { method: 'POST', headers, body: JSON.stringify({ action, ...data }) });
+        }
+
+        // Fallback: lokale API (wie vorher)
         const endpoint = '/api/endpoint.php';
-        
         if (method === 'GET') {
             return this.get(endpoint, { action, ...data });
         } else {

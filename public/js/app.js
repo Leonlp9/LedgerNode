@@ -44,8 +44,14 @@ const App = {
             this.showToast('Ein Fehler ist aufgetreten', 'error');
         });
 
-        // Init Updater (nur wenn server)
-        if (typeof window.IS_SERVER !== 'undefined' && window.IS_SERVER) {
+        // Modal sicher ausblenden beim Start
+        const modal = document.getElementById('update-modal');
+        if (modal) modal.style.display = 'none';
+
+        // Init Updater: entweder auf dem Server selbst oder auf Clients mit konfigurierter SERVER_API_URL
+        const isServer = (typeof window.IS_SERVER !== 'undefined' && window.IS_SERVER === true);
+        const serverUrl = (typeof window.SERVER_API_URL !== 'undefined' && window.SERVER_API_URL) ? window.SERVER_API_URL : null;
+        if (isServer || (!isServer && serverUrl)) {
             Updater.init();
         }
     },
@@ -258,7 +264,8 @@ const Updater = {
         if (installBtn) installBtn.addEventListener('click', () => this.installUpdates());
         if (closeBtn) closeBtn.addEventListener('click', () => this.hideModal());
 
-        // Starte periodische Prüfung
+        // Starte periodische Prüfung (stumm, Modal nur bei Updates)
+        // Start-up: prüfe im Hintergrund (Modal nur anzeigen, wenn Updates gefunden werden)
         this.checkUpdates(false).catch(() => {});
         this.timerId = setInterval(() => this.checkUpdates(false).catch(() => {}), this.intervalMs);
     },
@@ -268,12 +275,21 @@ const Updater = {
             document.getElementById('update-status').textContent = 'Prüfe auf Updates...';
             document.getElementById('update-commits').innerHTML = '';
 
-            const res = await API.postShared('checkUpdates', {});
+            let res;
+            const isServer = (typeof window.IS_SERVER !== 'undefined' && window.IS_SERVER === true);
+            if (isServer) {
+                // Server kann seine eigene Shared-API nutzen
+                res = await API.postShared('checkUpdates', {});
+            } else {
+                // Client: prüft lokal via private endpoint
+                res = await API.post('/api/private/check_updates', {});
+            }
             // API.postShared routet über /api/endpoint.php?action=checkUpdates
 
             this.lastResult = res;
 
             if (res.updates) {
+                // Nur wenn Updates vorhanden sind, zeige Modal (oder bei manueller Abfrage ebenfalls)
                 document.getElementById('update-status').textContent = 'Neue Commits vorhanden:';
                 const ul = document.getElementById('update-commits');
                 res.commits.forEach(c => {
@@ -281,19 +297,22 @@ const Updater = {
                     li.textContent = c;
                     ul.appendChild(li);
                 });
-                if (showModal) this.showModal();
-                // kleine Benachrichtigung
+                // Immer Modal zeigen, wenn Updates vorhanden (auch für automatische Prüfungen)
+                this.showModal();
                 App.showToast('Update verfügbar', 'info');
             } else {
+                // Kein Update
                 document.getElementById('update-status').textContent = 'Repository ist auf dem neuesten Stand.';
-                if (showModal) this.showModal();
+                // Modal niemals anzeigen, wenn keine Updates vorhanden sind. Falls es offen ist, schließen.
+                this.hideModal();
             }
 
             return res;
         } catch (err) {
             console.error('Fehler beim Prüfen auf Updates', err);
             document.getElementById('update-status').textContent = 'Fehler beim Prüfen auf Updates.';
-            if (showModal) this.showModal();
+            // Bei manueller Prüfung den Fehler im Modal zeigen, bei automatischer Prüfung nur Toast
+            if (showModal === true) this.showModal();
             App.showToast('Fehler beim Prüfen auf Updates', 'error');
             throw err;
         }
@@ -304,7 +323,15 @@ const Updater = {
             if (!confirm('Möchten Sie die Updates jetzt installieren? Dies kann die Anwendung verändern.')) return;
 
             document.getElementById('update-status').textContent = 'Installiere Updates...';
-            const res = await API.postShared('installUpdates', {});
+            const isServer = (typeof window.IS_SERVER !== 'undefined' && window.IS_SERVER === true);
+            let res;
+            if (isServer) {
+                // server-side installation via shared API
+                res = await API.postShared('installUpdates', {});
+            } else {
+                // client-side: execute local install endpoint (only after user confirmation)
+                res = await API.post('/api/private/install_updates', {});
+            }
 
             document.getElementById('update-status').textContent = 'Update erfolgreich installiert.';
             App.showToast('Update installiert', 'success');

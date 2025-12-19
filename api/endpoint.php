@@ -84,6 +84,112 @@ if (preg_match('#^/api/private(?:/.*)?$#', $reqPath) && !Config::isServer()) {
         exit;
     }
 
+    // ------------------------------------------------------------------------------------
+    // NEU: Client-side Update-Check (lokale Git-Operationen)
+    // GET/POST /api/private/check_updates
+    if (($_SERVER['REQUEST_METHOD'] === 'GET' || $_SERVER['REQUEST_METHOD'] === 'POST') && preg_match('#^/api/private/check_updates$#', $reqPath)) {
+        try {
+            $output = [];
+            $return = 0;
+            // Wechsle in Projektroot
+            $projectRoot = dirname(__DIR__);
+            if (is_dir($projectRoot)) chdir($projectRoot);
+
+            // git fetch
+            exec('git fetch 2>&1', $output, $return);
+            if ($return !== 0) {
+                echo json_encode(['success' => false, 'error' => 'git fetch failed', 'details' => $output]);
+                exit;
+            }
+
+            // bestimme remote branch
+            $branch = 'origin/master';
+            $out = [];
+            $ret = 0;
+            exec('git rev-parse --abbrev-ref origin/HEAD 2>&1', $out, $ret);
+            if ($ret === 0 && !empty($out[0]) && strpos($out[0], '/') !== false) {
+                $parts = explode('/', trim($out[0]));
+                $branch = 'origin/' . end($parts);
+            }
+
+            // prüfe commits
+            $commitOutput = [];
+            $ret = 0;
+            exec("git log HEAD..{$branch} --oneline 2>&1", $commitOutput, $ret);
+            if ($ret !== 0) {
+                echo json_encode(['success' => false, 'error' => 'git log failed', 'details' => $commitOutput]);
+                exit;
+            }
+
+            if (empty($commitOutput)) {
+                echo json_encode(['success' => true, 'data' => ['updates' => false, 'commits' => [], 'branch' => $branch]]);
+                exit;
+            }
+
+            echo json_encode(['success' => true, 'data' => ['updates' => true, 'commits' => $commitOutput, 'branch' => $branch]]);
+            exit;
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            exit;
+        }
+    }
+
+    // ------------------------------------------------------------------------------------
+    // POST /api/private/install_updates -> führt git pull lokal aus (nur nach Bestätigung durch Client UI)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && preg_match('#^/api/private/install_updates$#', $reqPath)) {
+        try {
+            $exclude = ['config.php', 'config.ini', 'uploads'];
+            $projectRoot = dirname(__DIR__);
+            if (is_dir($projectRoot)) chdir($projectRoot);
+
+            // mark exclude
+            foreach ($exclude as $item) {
+                exec('git update-index --assume-unchanged ' . escapeshellarg($item) . ' 2>&1');
+            }
+
+            $out = [];
+            $ret = 0;
+            exec('git checkout -- . 2>&1', $out, $ret);
+            if ($ret !== 0) {
+                // undo
+                foreach ($exclude as $item) {
+                    exec('git update-index --no-assume-unchanged ' . escapeshellarg($item) . ' 2>&1');
+                }
+                echo json_encode(['success' => false, 'error' => 'git checkout failed', 'details' => $out]);
+                exit;
+            }
+
+            // determine remote branch
+            $branch = 'origin/master';
+            $out2 = [];$r2=0;
+            exec('git rev-parse --abbrev-ref origin/HEAD 2>&1', $out2, $r2);
+            if ($r2 === 0 && !empty($out2[0]) && strpos($out2[0], '/') !== false) {
+                $parts = explode('/', trim($out2[0]));
+                $branch = 'origin/' . end($parts);
+            }
+
+            // pull
+            $pullOut = [];$r3=0;
+            exec('git pull ' . escapeshellarg($branch) . ' 2>&1', $pullOut, $r3);
+
+            // undo exclude
+            foreach ($exclude as $item) {
+                exec('git update-index --no-assume-unchanged ' . escapeshellarg($item) . ' 2>&1');
+            }
+
+            if ($r3 !== 0) {
+                echo json_encode(['success' => false, 'error' => 'git pull failed', 'details' => $pullOut]);
+                exit;
+            }
+
+            echo json_encode(['success' => true, 'data' => ['message' => 'updated', 'output' => $pullOut]]);
+            exit;
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            exit;
+        }
+    }
+
     // /api/private/stats
     if ($_SERVER['REQUEST_METHOD'] === 'GET' && preg_match('#^/api/private/stats$#', $reqPath)) {
         try {
@@ -272,6 +378,19 @@ try {
             'success' => false,
             'error' => 'API nicht verfügbar. Diese Instanz ist kein Server.'
         ]));
+    }
+
+    // --- SERVER: Starte asynchron einen Hintergrund-Update-Worker bei jedem Request ---
+    $script = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'auto_update.php';
+    if (file_exists($script)) {
+        // Platform-abhängiger Hintergrundstart
+        if (stripos(PHP_OS, 'WIN') === 0) {
+            // Windows: start /B "" php "script"
+            @exec('start /B "" php ' . escapeshellarg($script));
+        } else {
+            // Unix-like: php script > /dev/null 2>&1 &
+            @exec('php ' . escapeshellarg($script) . ' > /dev/null 2>&1 &');
+        }
     }
 
     // Instanziiere Server und verarbeite Request
