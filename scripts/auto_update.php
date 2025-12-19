@@ -19,7 +19,7 @@ use App\Core\Config;
 
 try {
     if (!Config::isServer()) {
-        logMsg('Not a server instance; aborting');
+        logMsg('Not a server instance; aborting'); //test
         exit;
     }
 } catch (\Exception $e) {
