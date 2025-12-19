@@ -179,9 +179,8 @@ const App = {
      * 
      * @param {string} moduleName - Name of the module (private|shared)
      * @param {string} tabId - ID of the tab to switch to
-     * @param {boolean} animate - Whether to animate the transition
      */
-    switchTab(moduleName, tabId, animate = true) {
+    switchTab(moduleName, tabId) {
         if (moduleName !== this.currentModule) {
             console.warn('Cannot switch tab for inactive module:', moduleName);
             return;

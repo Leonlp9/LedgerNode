@@ -595,7 +595,7 @@ const SharedModule = {
     async editAccountById(id) {
         // Fetch account details from the list
         const accounts = await API.getShared('getSharedAccounts');
-        const account = accounts.find(acc => acc.id == id);
+        const account = accounts.find(acc => acc.id === Number(id));
         if (account) {
             this.editAccount(id, account.name);
         }
