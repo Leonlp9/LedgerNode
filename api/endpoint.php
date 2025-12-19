@@ -89,44 +89,85 @@ if (preg_match('#^/api/private(?:/.*)?$#', $reqPath) && !Config::isServer()) {
     // GET/POST /api/private/check_updates
     if (($_SERVER['REQUEST_METHOD'] === 'GET' || $_SERVER['REQUEST_METHOD'] === 'POST') && preg_match('#^/api/private/check_updates$#', $reqPath)) {
         try {
-            $output = [];
-            $return = 0;
-            // Wechsle in Projektroot
             $projectRoot = dirname(__DIR__);
             if (is_dir($projectRoot)) chdir($projectRoot);
 
-            // git fetch
-            exec('git fetch 2>&1', $output, $return);
+            // Prüfe ob origin existiert
+            $remOut = [];$remRet = 0;
+            exec('git remote get-url origin 2>&1', $remOut, $remRet);
+            if ($remRet !== 0) {
+                echo json_encode(['success' => false, 'error' => 'Kein Remote "origin" konfiguriert', 'details' => $remOut]);
+                exit;
+            }
+
+            // Fetch vom Remote
+            $output = [];
+            $return = 0;
+            exec('git fetch origin 2>&1', $output, $return);
             if ($return !== 0) {
                 echo json_encode(['success' => false, 'error' => 'git fetch failed', 'details' => $output]);
                 exit;
             }
 
-            // bestimme remote branch
-            $branch = 'origin/master';
-            $out = [];
-            $ret = 0;
-            exec('git rev-parse --abbrev-ref origin/HEAD 2>&1', $out, $ret);
-            if ($ret === 0 && !empty($out[0]) && strpos($out[0], '/') !== false) {
-                $parts = explode('/', trim($out[0]));
-                $branch = 'origin/' . end($parts);
+            // Versuche den Upstream der aktuellen Branch zu bestimmen
+            $upstream = [];$uRet=0;
+            exec('git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>&1', $upstream, $uRet);
+            $remote = 'origin'; $remoteBranch = null;
+            if ($uRet === 0 && !empty($upstream[0])) {
+                // upstream hat z.B. origin/main
+                $parts = explode('/', $upstream[0], 2);
+                if (count($parts) === 2) {
+                    $remote = $parts[0];
+                    $remoteBranch = $parts[1];
+                } else {
+                    $remoteBranch = $upstream[0];
+                }
+            } else {
+                // Fallback: parse `git remote show origin` -> '  HEAD branch: main'
+                $remoteShow = [];$rsRet=0;
+                exec('git remote show origin 2>&1', $remoteShow, $rsRet);
+                foreach ($remoteShow as $line) {
+                    if (stripos($line, 'HEAD branch:') !== false) {
+                        $rb = trim(substr($line, stripos($line, ':') + 1));
+                        if ($rb !== '') {
+                            $remoteBranch = $rb;
+                            break;
+                        }
+                    }
+                }
+                // Noch ein Fallback: origin/HEAD
+                if ($remoteBranch === null) {
+                    $oHead = [];$ohRet=0;
+                    exec('git rev-parse --abbrev-ref origin/HEAD 2>&1', $oHead, $ohRet);
+                    if ($ohRet === 0 && !empty($oHead[0]) && strpos($oHead[0], '/') !== false) {
+                        $parts = explode('/', trim($oHead[0]));
+                        $remoteBranch = end($parts);
+                    }
+                }
             }
+
+            if (empty($remoteBranch)) {
+                echo json_encode(['success' => false, 'error' => 'Konnte Remote-Branch nicht bestimmen', 'details' => ['upstream' => $upstream, 'remote_show' => $remoteShow ?? []]]);
+                exit;
+            }
+
+            $remoteRef = $remote . '/' . $remoteBranch;
 
             // prüfe commits
             $commitOutput = [];
             $ret = 0;
-            exec("git log HEAD..{$branch} --oneline 2>&1", $commitOutput, $ret);
+            exec("git log HEAD..{$remoteRef} --oneline 2>&1", $commitOutput, $ret);
             if ($ret !== 0) {
                 echo json_encode(['success' => false, 'error' => 'git log failed', 'details' => $commitOutput]);
                 exit;
             }
 
             if (empty($commitOutput)) {
-                echo json_encode(['success' => true, 'data' => ['updates' => false, 'commits' => [], 'branch' => $branch]]);
+                echo json_encode(['success' => true, 'data' => ['updates' => false, 'commits' => [], 'branch' => $remoteRef]]);
                 exit;
             }
 
-            echo json_encode(['success' => true, 'data' => ['updates' => true, 'commits' => $commitOutput, 'branch' => $branch]]);
+            echo json_encode(['success' => true, 'data' => ['updates' => true, 'commits' => $commitOutput, 'branch' => $remoteRef]]);
             exit;
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -141,6 +182,14 @@ if (preg_match('#^/api/private(?:/.*)?$#', $reqPath) && !Config::isServer()) {
             $exclude = ['config.php', 'config.ini', 'uploads'];
             $projectRoot = dirname(__DIR__);
             if (is_dir($projectRoot)) chdir($projectRoot);
+
+            // Prüfe origin
+            $remOut = [];$remRet = 0;
+            exec('git remote get-url origin 2>&1', $remOut, $remRet);
+            if ($remRet !== 0) {
+                echo json_encode(['success' => false, 'error' => 'Kein Remote "origin" konfiguriert', 'details' => $remOut]);
+                exit;
+            }
 
             // mark exclude
             foreach ($exclude as $item) {
@@ -159,18 +208,49 @@ if (preg_match('#^/api/private(?:/.*)?$#', $reqPath) && !Config::isServer()) {
                 exit;
             }
 
-            // determine remote branch
-            $branch = 'origin/master';
-            $out2 = [];$r2=0;
-            exec('git rev-parse --abbrev-ref origin/HEAD 2>&1', $out2, $r2);
-            if ($r2 === 0 && !empty($out2[0]) && strpos($out2[0], '/') !== false) {
-                $parts = explode('/', trim($out2[0]));
-                $branch = 'origin/' . end($parts);
+            // Bestimme Branch ähnlich wie beim Check
+            $remote = 'origin'; $remoteBranch = null;
+            $upstream = [];$uRet=0;
+            exec('git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>&1', $upstream, $uRet);
+            if ($uRet === 0 && !empty($upstream[0])) {
+                $parts = explode('/', $upstream[0], 2);
+                if (count($parts) === 2) {
+                    $remote = $parts[0];
+                    $remoteBranch = $parts[1];
+                } else {
+                    $remoteBranch = $upstream[0];
+                }
+            } else {
+                $remoteShow = [];$rsRet=0;
+                exec('git remote show origin 2>&1', $remoteShow, $rsRet);
+                foreach ($remoteShow as $line) {
+                    if (stripos($line, 'HEAD branch:') !== false) {
+                        $rb = trim(substr($line, stripos($line, ':') + 1));
+                        if ($rb !== '') { $remoteBranch = $rb; break; }
+                    }
+                }
+                if ($remoteBranch === null) {
+                    $oHead = [];$ohRet=0;
+                    exec('git rev-parse --abbrev-ref origin/HEAD 2>&1', $oHead, $ohRet);
+                    if ($ohRet === 0 && !empty($oHead[0]) && strpos($oHead[0], '/') !== false) {
+                        $parts = explode('/', trim($oHead[0]));
+                        $remoteBranch = end($parts);
+                    }
+                }
             }
 
-            // pull
+            if (empty($remoteBranch)) {
+                foreach ($exclude as $item) {
+                    exec('git update-index --no-assume-unchanged ' . escapeshellarg($item) . ' 2>&1');
+                }
+                echo json_encode(['success' => false, 'error' => 'Konnte Remote-Branch nicht bestimmen', 'details' => [$upstream, $remoteShow ?? []]]);
+                exit;
+            }
+
+            // Pull using remote and branch
             $pullOut = [];$r3=0;
-            exec('git pull ' . escapeshellarg($branch) . ' 2>&1', $pullOut, $r3);
+            $pullCmd = 'git pull ' . escapeshellarg($remote) . ' ' . escapeshellarg($remoteBranch) . ' 2>&1';
+            exec($pullCmd, $pullOut, $r3);
 
             // undo exclude
             foreach ($exclude as $item) {

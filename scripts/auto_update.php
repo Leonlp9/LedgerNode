@@ -19,7 +19,7 @@ use App\Core\Config;
 
 try {
     if (!Config::isServer()) {
-        logMsg('Not a server instance; aborting'); //test
+        logMsg('Not a server instance; aborting');
         exit;
     }
 } catch (\Exception $e) {
@@ -36,15 +36,49 @@ if ($retFetch !== 0) {
 }
 
 // Bestimme remote branch
-$branch = 'origin/master';
-exec('git rev-parse --abbrev-ref origin/HEAD 2>&1', $outBranch, $rBranch);
-if ($rBranch === 0 && !empty($outBranch[0]) && strpos($outBranch[0], '/') !== false) {
-    $parts = explode('/', trim($outBranch[0]));
-    $branch = 'origin/' . end($parts);
+$remote = 'origin';
+$remoteBranch = null;
+
+// Versuche Upstream der aktuellen Branch zu bestimmen
+$upstream = [];$uRet = 0;
+exec('git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>&1', $upstream, $uRet);
+if ($uRet === 0 && !empty($upstream[0])) {
+    $parts = explode('/', $upstream[0], 2);
+    if (count($parts) === 2) {
+        $remote = $parts[0];
+        $remoteBranch = $parts[1];
+    } else {
+        $remoteBranch = $upstream[0];
+    }
+} else {
+    // Fallback: remote show origin -> HEAD branch
+    $remoteShow = [];$rsRet = 0;
+    exec('git remote show origin 2>&1', $remoteShow, $rsRet);
+    foreach ($remoteShow as $line) {
+        if (stripos($line, 'HEAD branch:') !== false) {
+            $rb = trim(substr($line, stripos($line, ':') + 1));
+            if ($rb !== '') { $remoteBranch = $rb; break; }
+        }
+    }
+    if ($remoteBranch === null) {
+        $oHead = [];$ohRet = 0;
+        exec('git rev-parse --abbrev-ref origin/HEAD 2>&1', $oHead, $ohRet);
+        if ($ohRet === 0 && !empty($oHead[0]) && strpos($oHead[0], '/') !== false) {
+            $parts = explode('/', trim($oHead[0]));
+            $remoteBranch = end($parts);
+        }
+    }
 }
 
+if (empty($remoteBranch)) {
+    logMsg('Konnte Remote-Branch nicht bestimmen; aborting');
+    exit;
+}
+
+$remoteRef = $remote . '/' . $remoteBranch;
+
 // Prüfe ob es neue Commits gibt
-exec("git log HEAD..{$branch} --oneline 2>&1", $outLog, $rLog);
+exec("git log HEAD..{$remoteRef} --oneline 2>&1", $outLog, $rLog);
 if ($rLog !== 0) {
     logMsg('git log failed: ' . implode('\n', $outLog));
     exit;
@@ -71,7 +105,10 @@ if ($rCheckout !== 0) {
     exit;
 }
 
-exec('git pull ' . escapeshellarg($branch) . ' 2>&1', $outPull, $rPull);
+// Pull using remote + branch (sauberer Aufruf)
+$outPull = [];$rPull = 0;
+$pullCmd = 'git pull ' . escapeshellarg($remote) . ' ' . escapeshellarg($remoteBranch) . ' 2>&1';
+exec($pullCmd, $outPull, $rPull);
 foreach ($exclude as $item) {
     exec('git update-index --no-assume-unchanged ' . escapeshellarg($item) . ' 2>&1');
 }
