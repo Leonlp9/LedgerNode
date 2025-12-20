@@ -23,14 +23,11 @@ $assetVersion = time();
     <!-- Header -->
     <header class="header">
         <div class="container">
-            <h1 class="logo">
-                <?= htmlspecialchars(\App\Core\Config::get('APP.name', 'Accounting')) ?>
-            </h1>
-            <div class="header-info">
-                <span class="instance-badge <?= \App\Core\Config::isServer() ? 'server' : 'client' ?>">
-                    <?= \App\Core\Config::isServer() ? '🖥️ Server' : '📟 Client' ?>
-                </span>
-            </div>
+            <!-- Logo als Bild statt Text -->
+            <a href="<?= htmlspecialchars($basePath ?: '/') ?>" class="logo-link">
+                <img src="<?= htmlspecialchars($basePath . '/logo.png') ?>" alt="<?= htmlspecialchars(\App\Core\Config::get('APP.name', 'Accounting')) ?>" class="logo-img">
+            </a>
+            <!-- Die Instance-Badge (Client/Server) wurde entfernt -->
         </div>
     </header>
 

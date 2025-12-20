@@ -138,14 +138,26 @@ a:hover {
     font-weight: 500;
 }
 
-.instance-badge.server {
-    background: var(--success);
-    color: white;
+/* --- Logo als Bild: neue Regeln --- */
+.logo-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
 }
 
-.instance-badge.client {
-    background: var(--info);
-    color: white;
+.logo-img {
+    /* Maximalhöhe so das Logo in die Header-Leiste passt */
+    max-height: calc(var(--header-height) - 16px);
+    height: auto;
+    width: auto;
+    display: block;
+}
+
+/* Responsive: auf sehr kleinen Bildschirmen etwas kleiner darstellen */
+@media (max-width: 480px) {
+    .logo-img {
+        max-height: calc(var(--header-height) - 24px);
+    }
 }
 
 /* ==========================================
