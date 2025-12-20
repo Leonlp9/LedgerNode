@@ -52,6 +52,27 @@ try {
     exit(1);
 }
 
+// Wenn dies eine Server-Instanz ist, soll sie KEINE Benutzeroberfläche ausliefern.
+// Nur die API (z.B. /api/endpoint.php) soll verfügbar sein. Alle UI-Anfragen werden mit 404 beantwortet.
+if (Config::isServer()) {
+    // Return 404 for UI requests. If client expects JSON (AJAX/API) return JSON.
+    http_response_code(404);
+    $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+    $isApiLike = (strpos($accept, 'application/json') !== false) || (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], '/api/') !== false);
+    if ($isApiLike) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'error' => 'Not Found',
+            'message' => 'Diese Instanz ist als Server konfiguriert und liefert keine Benutzeroberfläche. Bitte verwenden Sie die API unter /api/endpoint.php.'
+        ], JSON_UNESCAPED_UNICODE);
+    } else {
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>404 — Nicht gefunden</title></head><body style="font-family:Arial,Helvetica,sans-serif;padding:40px;color:#222;background:#f7f7f7"><div style="max-width:800px;margin:40px auto;background:#fff;padding:24px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06)"><h1>404 — Nicht gefunden</h1><p>Diese Instanz läuft im Server-Modus und stellt keine Benutzeroberfläche bereit. Verwenden Sie die API: <code>/api/endpoint.php</code></p></div></body></html>';
+    }
+    exit;
+}
+
 // Error Reporting (nur in Development)
 if (Config::get('APP.debug', false)) {
     error_reporting(E_ALL);
