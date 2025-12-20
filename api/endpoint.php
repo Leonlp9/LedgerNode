@@ -20,7 +20,65 @@ $allowedOrigins = [
     'http://127.0.0.1:8000'
 ];
 $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+
+// Hilfsfunktion: prüfe ob eine IPv4-Adresse in RFC1918 / Loopback Bereich liegt
+$ipIsPrivate = function(string $ip): bool {
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) return false;
+    if (strpos($ip, ':') !== false) {
+        // einfache IPv6-Prüfung: loopback ::1 und ULA fc00::/7
+        if ($ip === '::1') return true;
+        $first = strtolower(explode(':', $ip)[0]);
+        if (strpos($first, 'fc') === 0 || strpos($first, 'fd') === 0) return true;
+        return false;
+    }
+
+    $long = ip2long($ip);
+    if ($long === false) return false;
+
+    $ranges = [
+        ['10.0.0.0', '10.255.255.255'],
+        ['172.16.0.0', '172.31.255.255'],
+        ['192.168.0.0', '192.168.255.255'],
+        ['127.0.0.0', '127.255.255.255']
+    ];
+
+    foreach ($ranges as $r) {
+        if ($long >= ip2long($r[0]) && $long <= ip2long($r[1])) {
+            return true;
+        }
+    }
+    return false;
+};
+
+$allow = false;
 if ($origin && in_array($origin, $allowedOrigins, true)) {
+    $allow = true;
+} elseif ($origin) {
+    // Versuche Host aus Origin zu parsen
+    $host = parse_url($origin, PHP_URL_HOST);
+    if ($host !== null) {
+        // Direkte Hostnamen wie 'localhost'
+        if (in_array(strtolower($host), ['localhost'], true)) {
+            $allow = true;
+        } else {
+            // Falls Host eine IP ist oder sich auflösen lässt, prüfe privaten Bereich
+            $resolved = $host;
+            if (!filter_var($host, FILTER_VALIDATE_IP)) {
+                // Versuche DNS-Auflösung (still, ohne Fehler)
+                $resolved = gethostbyname($host);
+            }
+            if ($resolved && $resolved !== $host && filter_var($resolved, FILTER_VALIDATE_IP)) {
+                if ($ipIsPrivate($resolved)) {
+                    $allow = true;
+                }
+            } elseif (filter_var($host, FILTER_VALIDATE_IP) && $ipIsPrivate($host)) {
+                $allow = true;
+            }
+        }
+    }
+}
+
+if ($allow) {
     // Setze Origin exakt (nicht '*') — wichtig wenn Credentials verwendet werden
     header('Access-Control-Allow-Origin: ' . $origin);
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -54,7 +112,37 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
     throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
 });
 
-set_exception_handler(function($exception) {
+set_exception_handler(function($exception) use ($origin, $ipIsPrivate, $allowedOrigins) {
+    // Falls Origin vorhanden und privat/erlaubt, sende die gleichen CORS-Header wie im normalen Pfad
+    $allowEx = false;
+    if ($origin && in_array($origin, $allowedOrigins, true)) {
+        $allowEx = true;
+    } elseif ($origin) {
+        $host = parse_url($origin, PHP_URL_HOST);
+        if ($host !== null) {
+            if (in_array(strtolower($host), ['localhost'], true)) {
+                $allowEx = true;
+            } else {
+                $resolved = $host;
+                if (!filter_var($host, FILTER_VALIDATE_IP)) {
+                    $resolved = gethostbyname($host);
+                }
+                if ($resolved && $resolved !== $host && filter_var($resolved, FILTER_VALIDATE_IP) && $ipIsPrivate($resolved)) {
+                    $allowEx = true;
+                } elseif (filter_var($host, FILTER_VALIDATE_IP) && $ipIsPrivate($host)) {
+                    $allowEx = true;
+                }
+            }
+        }
+    }
+
+    if ($allowEx) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        header('Access-Control-Allow-Headers: X-API-Key, Content-Type, Authorization');
+        header('Vary: Origin');
+    }
+
     http_response_code(500);
     header('Content-Type: application/json');
     

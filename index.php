@@ -11,6 +11,47 @@ require_once __DIR__ . '/vendor/autoload.php';
 use App\Core\Config;
 use App\Core\Security;
 
+// Versuche die Konfiguration früh zu laden und fange Fehler ab, damit der Anwender
+// eine aussagekräftige, freundlich formatierte Fehlermeldung im Browser sieht.
+try {
+    // Diese Methode initialisiert und validiert die Konfiguration
+    Config::getInstance();
+} catch (\Throwable $e) {
+    // Technische Details in temporäres Log schreiben (nur für Admins lesbar auf dem Server)
+    $logFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'ledger_error.log';
+    error_log(sprintf("%s - Startup error: %s\n", date('c'), (string)$e), 3, $logFile);
+    // Auch in das PHP-Errorlog schreiben
+    error_log("LedgerNode startup error: " . (string)$e);
+
+    // Benutzerfreundliche Fehlerseite anzeigen (DE)
+    http_response_code(500);
+    $safeMessage = htmlspecialchars($e->getMessage(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $showDetails = (isset($_GET['debug']) && $_GET['debug'] === '1');
+    echo '<!doctype html>';
+    echo '<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+    echo '<title>LedgerNode — Konfigurationsfehler</title>';
+    echo '<style>body{font-family:Arial,Helvetica,sans-serif;background:#f7f7f7;color:#222;padding:40px} .card{max-width:800px;margin:40px auto;background:#fff;padding:24px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06)} h1{margin-top:0;color:#c0392b} p{line-height:1.5} .hint{background:#f1f1f1;padding:10px;border-radius:4px;font-size:0.95em}</style>';
+    echo '</head><body><div class="card">';
+    echo '<h1>Einrichtungsfehler</h1>';
+    echo '<p>Die Anwendung konnte nicht gestartet werden, weil die Server-Konfiguration unvollständig oder fehlerhaft ist.</p>';
+    echo '<p class="hint"><strong>Fehler (Kurz):</strong> ' . $safeMessage . '</p>';
+    echo '<h2>Was Sie jetzt tun können</h2>';
+    echo '<ul>';
+    echo '<li>Öffnen Sie die Datei <code>config.php</code> im Projektstamm (oder kopieren Sie <code>config.example.php</code> zu <code>config.php</code> und passen Sie sie an).</li>';
+    echo '<li>Prüfen Sie insbesondere folgende Werte: <code>IS_SERVER</code>, <code>API_KEY</code> (mind. 32 Zeichen) und für Clients <code>API_URL</code>.</li>';
+    echo '<li>Wenn Sie sich nicht sicher sind, lesen Sie die README oder QUICKSTART im Projektordner.</li>';
+    echo '</ul>';
+    echo '<p>Technische Details wurden in <code>' . htmlspecialchars($logFile, ENT_QUOTES|ENT_SUBSTITUTE, 'UTF-8') . '</code> protokolliert.</p>';
+    if ($showDetails) {
+        echo '<h3>Technische Details</h3>';
+        echo '<pre style="white-space:pre-wrap;background:#111;color:#eee;padding:12px;border-radius:4px">' . htmlspecialchars((string)$e, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</pre>';
+    } else {
+        echo '<p style="font-size:.9em;color:#666">Für Debugging können Sie die technische Ausgabe sehen, indem Sie <code>?debug=1</code> an die URL anhängen (nur für lokale Tests).</p>';
+    }
+    echo '</div></body></html>';
+    exit(1);
+}
+
 // Error Reporting (nur in Development)
 if (Config::get('APP.debug', false)) {
     error_reporting(E_ALL);

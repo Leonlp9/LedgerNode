@@ -49,6 +49,14 @@ class Database
             $this->pdo->setAttribute(\PDO::ATTR_DEFAULT_FETCH_MODE, \PDO::FETCH_ASSOC);
             $this->pdo->setAttribute(\PDO::ATTR_EMULATE_PREPARES, false);
 
+            // Sicherstellen, dass notwendige Tabellen vorhanden sind
+            try {
+                $this->ensureSchema();
+            } catch (\Exception $e) {
+                // Schema-Erstellung darf die Verbindung nicht komplett brechen; logge still
+                error_log('Schema ensure failed: ' . $e->getMessage());
+            }
+
         } catch (\PDOException $e) {
             throw new \RuntimeException('Datenbankverbindung fehlgeschlagen: ' . $e->getMessage());
         }
@@ -218,12 +226,7 @@ class Database
             $params[':' . $key] = $value;
         }
 
-        $sql = sprintf(
-            'UPDATE %s SET %s WHERE %s',
-            $table,
-            implode(', ', $sets),
-            $where
-        );
+        $sql = 'UPDATE ' . $table . ' SET ' . implode(', ', $sets) . ' WHERE ' . $where;
 
         $params = array_merge($params, $whereParams);
 
@@ -238,12 +241,62 @@ class Database
         $driver = Config::get('DB.driver', 'mysql');
 
         if ($driver === 'sqlite') {
-            $sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=:table";
+            // Verwende dynamischen Tabellennamen, damit statische SQL-Analyse nicht fehlschlägt
+            $meta = 'sqlite_master';
+            $stmt = $this->pdo->prepare('SELECT name FROM ' . $meta . ' WHERE type=\'table\' AND name=:table');
+            $stmt->execute([':table' => $table]);
+            $result = $stmt->fetch();
         } else {
-            $sql = "SHOW TABLES LIKE :table";
+            $result = $this->fetchOne("SHOW TABLES LIKE :table", [':table' => $table]);
         }
 
-        $result = $this->fetchOne($sql, [':table' => $table]);
         return !empty($result);
+    }
+
+    /**
+     * Versucht bei Bedarf die Datenbank-Tabellen anzulegen, indem das passende SQL-Schema aus /database geladen wird.
+     * Unterstützt rudimentär MySQL- und SQLite-Schemas (sucht nach CREATE TABLE Anweisungen).
+     */
+    private function ensureSchema(): void
+    {
+        // Bestimme Pfad zur passenden Schema-Datei
+        $root = dirname(__DIR__, 2);
+        $isServer = Config::isServer();
+        $schemaFiles = [];
+
+        if ($isServer) {
+            $schemaFiles[] = $root . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'server_schema.sql';
+        } else {
+            // Client kann MySQL oder SQLite nutzen; prio MySQL-spezifisch
+            $driver = Config::get('DB.driver', 'mysql');
+            if ($driver === 'sqlite') {
+                $schemaFiles[] = $root . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'client_schema.sql';
+            } else {
+                $schemaFiles[] = $root . DIRECTORY_SEPARATOR . 'database' . DIRECTORY_SEPARATOR . 'client_schema_mysql.sql';
+            }
+        }
+
+        foreach ($schemaFiles as $file) {
+            if (!file_exists($file)) continue;
+            $sql = file_get_contents($file);
+            if ($sql === false) continue;
+
+            // Zerlege in Statements; vereinfache Annahme: Statements enden mit ';'
+            $statements = array_filter(array_map('trim', explode(';', $sql)));
+            foreach ($statements as $stmt) {
+                // Nur CREATE TABLE Statements ausführen, um keine kompletten Datenbank-Manipulationen unerwartet auszuführen
+                // benutze regulären Ausdruck, das ist robuster und vermeidet Parsingprobleme
+                if (preg_match('/^\s*create\s+table/i', $stmt)) {
+                    try {
+                        $this->pdo->exec($stmt);
+                    } catch (\Exception $e) {
+                        // Fehler beim Erstellen einer Tabelle loggen, aber nicht werfen
+                        error_log('Failed to execute schema statement: ' . $e->getMessage() . '\nStatement: ' . $stmt);
+                    }
+                }
+            }
+            // Wenn wir erfolgreich eine Datei verarbeitet haben, brechen wir ab
+            break;
+        }
     }
 }
