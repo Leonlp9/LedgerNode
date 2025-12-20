@@ -87,7 +87,13 @@ const API = {
             if (typeof data === 'object' && data !== null && Object.prototype.hasOwnProperty.call(data, 'success')) {
                 if (data.success === false) {
                     // Server-seitiger Fehler (nicht erfolgreich)
-                    throw new Error(data.error || data.message || `API Error`);
+                    // Erzeuge ein Error-Objekt und hänge ggf. zusätzliche Details an
+                    const msg = data.error || data.message || `API Error`;
+                    const err = new Error(msg);
+                    if (data.details) err.details = data.details;
+                    // Manche Endpoints packen die nützlichen Infos unter data.details
+                    if (data.data && data.data.details) err.details = data.data.details;
+                    throw err;
                 }
 
                 // Erfolg: gib nur das payload zurück
@@ -96,7 +102,10 @@ const API = {
 
             // HTTP-Fehler (falls Status >=400)
             if (!response.ok) {
-                throw new Error(data.error || data.message || `HTTP ${response.status}`);
+                const msg = (data && (data.error || data.message)) ? (data.error || data.message) : `HTTP ${response.status}`;
+                const err = new Error(msg);
+                if (data && data.details) err.details = data.details;
+                throw err;
             }
 
             return data;

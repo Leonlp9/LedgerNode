@@ -448,7 +448,29 @@ const Updater = {
             console.error('Fehler beim Prüfen auf Updates', err);
             document.getElementById('update-status').textContent = 'Fehler beim Prüfen auf Updates.';
             // Bei manueller Prüfung den Fehler im Modal zeigen, bei automatischer Prüfung nur Toast
-            if (showModal === true) this.showModal();
+            if (showModal === true) {
+                // Wenn der Error Detail-Informationen enthält, zeige sie im Modal Commit-List
+                if (err && err.details && Array.isArray(err.details)) {
+                    document.getElementById('update-commits').innerHTML = '';
+                    err.details.forEach(d => {
+                        const li = document.createElement('li');
+                        li.textContent = d;
+                        document.getElementById('update-commits').appendChild(li);
+                    });
+                    document.getElementById('update-status').textContent = err.message || 'Fehler beim Prüfen auf Updates.';
+                    this.showModal(false);
+                } else if (err && err.message) {
+                    // Fallback: zeige einfache Fehlermeldung im Modal
+                    document.getElementById('update-commits').innerHTML = '';
+                    const li = document.createElement('li');
+                    li.textContent = err.message;
+                    document.getElementById('update-commits').appendChild(li);
+                    document.getElementById('update-status').textContent = 'Fehler beim Prüfen auf Updates';
+                    this.showModal(false);
+                } else {
+                    this.showModal();
+                }
+            }
             App.showToast('Fehler beim Prüfen auf Updates', 'error');
             throw err;
         }
