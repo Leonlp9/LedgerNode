@@ -1461,3 +1461,35 @@ a:hover {
     display: flex;
     gap: 8px;
 }
+
+/* ==========================================
+   BACKUP & EXPORT STYLES
+   ========================================== */
+.backup-info {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 15px;
+    margin-top: 20px;
+}
+
+.backup-info ul {
+    margin: 10px 0 0 20px;
+    list-style: disc;
+}
+
+.backup-info li {
+    margin: 5px 0;
+    color: var(--gray-700);
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.btn-large {
+    padding: 12px 24px;
+    font-size: 16px;
+}

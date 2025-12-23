@@ -165,6 +165,37 @@ try {
             ]);
             break;
 
+        case 'generateBackup':
+            if ($method !== 'POST') {
+                throw new RuntimeException('Nur POST erlaubt');
+            }
+            
+            require_once __DIR__ . '/../src/Services/BackupExporter.php';
+            $exporter = new \App\Services\BackupExporter();
+            
+            $period = $_POST['period'] ?? 'all';
+            $params = [];
+            
+            if ($period === 'month') {
+                $params['year'] = $_POST['year'] ?? date('Y');
+                $params['month'] = $_POST['month'] ?? date('m');
+            } elseif ($period === 'year') {
+                $params['year'] = $_POST['year'] ?? date('Y');
+            }
+            
+            $zipPath = $exporter->generatePrivateBackup($period, $params);
+            
+            // Convert to relative URL
+            $basePath = dirname(__DIR__);
+            $relativeUrl = str_replace($basePath, '', $zipPath);
+            
+            sendSuccess([
+                'download_url' => $relativeUrl,
+                'filename' => basename($zipPath),
+                'message' => 'Backup erfolgreich erstellt'
+            ]);
+            break;
+
         // Private stats endpoint
         case 'stats':
             $db = Database::getInstance();

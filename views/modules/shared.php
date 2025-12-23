@@ -262,6 +262,87 @@
     </div>
 </div>
 
+<!-- Tab: Backup -->
+<div class="tab-content" id="shared-tab-backup" style="display: none;">
+    <div class="module-header">
+        <h2>Backup & Export</h2>
+        <p class="subtitle">Erstelle Backups deiner gemeinsamen Rechnungen mit allen Dateien und Details</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Backup erstellen</h3>
+        </div>
+        <div class="card-body">
+            <form id="shared-backup-form" onsubmit="SharedModule.generateBackup(event)">
+                <div class="form-group">
+                    <label for="shared-backup-period">Zeitraum</label>
+                    <select id="shared-backup-period" name="period" onchange="SharedModule.updateBackupOptions()">
+                        <option value="month">Einzelner Monat</option>
+                        <option value="year">Ganzes Jahr</option>
+                        <option value="all">Alle Rechnungen</option>
+                    </select>
+                </div>
+
+                <div id="shared-backup-month-options">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="shared-backup-year">Jahr</label>
+                            <input type="number" id="shared-backup-year" name="year" min="2000" max="2100" value="">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="shared-backup-month">Monat</label>
+                            <select id="shared-backup-month" name="month">
+                                <option value="1">Januar</option>
+                                <option value="2">Februar</option>
+                                <option value="3">März</option>
+                                <option value="4">April</option>
+                                <option value="5">Mai</option>
+                                <option value="6">Juni</option>
+                                <option value="7">Juli</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">Oktober</option>
+                                <option value="11">November</option>
+                                <option value="12">Dezember</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="shared-backup-year-options" style="display: none;">
+                    <div class="form-group">
+                        <label for="shared-backup-year-only">Jahr</label>
+                        <input type="number" id="shared-backup-year-only" name="year_only" min="2000" max="2100" value="">
+                    </div>
+                </div>
+
+                <div class="backup-info">
+                    <p><strong>Was wird exportiert:</strong></p>
+                    <ul>
+                        <li>Alle Rechnungs-PDF-Dateien im gewählten Zeitraum</li>
+                        <li>Excel-Tabelle mit allen Rechnungsdetails</li>
+                        <li>Gepackt als ZIP-Datei zum einfachen Download</li>
+                    </ul>
+                </div>
+
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary btn-large">
+                        💾 Backup generieren
+                    </button>
+                </div>
+            </form>
+
+            <div id="shared-backup-loading" style="display: none; text-align: center; padding: 40px;">
+                <div class="spinner" style="margin: 0 auto 20px;"></div>
+                <p><strong>Backup wird erstellt...</strong></p>
+                <p>Dies kann einige Sekunden dauern.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: Add YouTube Income -->
 <div id="youtube-income-modal" class="modal" style="display: none;">
     <div class="modal-content">
@@ -479,7 +560,8 @@ const SharedModule = {
                 { id: 'transactions', label: 'Transaktionen', icon: '💳' },
                 { id: 'accounts', label: 'Konten', icon: '📁' },
                 { id: 'invoices', label: 'Rechnungen', icon: '📄' },
-                { id: 'youtube', label: 'YouTube', icon: '📺' }
+                { id: 'youtube', label: 'YouTube', icon: '📺' },
+                { id: 'backup', label: 'Backup', icon: '💾' }
             ]);
         }
 
@@ -496,6 +578,9 @@ const SharedModule = {
         
         // Setze heutiges Datum als Standard
         document.getElementById('shared-tx-date').valueAsDate = new Date();
+        
+        // Initialize backup options
+        this.updateBackupOptions();
     },
 
     async checkServerConnection() {
@@ -1182,6 +1267,80 @@ const SharedModule = {
             await this.loadYouTubeExpenses();
         } catch (error) {
             App.showToast('Fehler beim Löschen', 'error');
+        }
+    },
+
+    // ========== Backup Functions ==========
+
+    updateBackupOptions() {
+        const period = document.getElementById('shared-backup-period').value;
+        const monthOptions = document.getElementById('shared-backup-month-options');
+        const yearOptions = document.getElementById('shared-backup-year-options');
+        
+        const now = new Date();
+        
+        if (period === 'month') {
+            monthOptions.style.display = 'block';
+            yearOptions.style.display = 'none';
+            document.getElementById('shared-backup-year').value = now.getFullYear();
+            document.getElementById('shared-backup-month').value = now.getMonth() + 1;
+        } else if (period === 'year') {
+            monthOptions.style.display = 'none';
+            yearOptions.style.display = 'block';
+            document.getElementById('shared-backup-year-only').value = now.getFullYear();
+        } else {
+            monthOptions.style.display = 'none';
+            yearOptions.style.display = 'none';
+        }
+    },
+
+    async generateBackup(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        // Show loading state
+        document.getElementById('shared-backup-loading').style.display = 'block';
+        form.style.display = 'none';
+        
+        try {
+            // Prepare request data
+            const period = data.period;
+            const params = { period };
+            
+            if (period === 'month') {
+                params.year = data.year;
+                params.month = data.month;
+            } else if (period === 'year') {
+                params.year = data.year_only || data.year;
+            }
+            
+            // Call API
+            const result = await API.postShared('generateBackup', params);
+            
+            if (result && result.download_url) {
+                // Download the file
+                const link = document.createElement('a');
+                link.href = result.download_url;
+                link.download = result.filename || 'backup.zip';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                App.showToast('✅ Backup erfolgreich erstellt', 'success');
+            } else {
+                throw new Error('Backup konnte nicht erstellt werden');
+            }
+            
+        } catch (error) {
+            console.error('Error generating backup:', error);
+            App.showToast('Fehler beim Erstellen des Backups: ' + (error.message || 'Unbekannter Fehler'), 'error');
+        } finally {
+            // Hide loading state
+            document.getElementById('shared-backup-loading').style.display = 'none';
+            form.style.display = 'block';
         }
     }
 };

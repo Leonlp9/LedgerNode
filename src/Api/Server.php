@@ -776,6 +776,37 @@ class Server
     }
 
     /**
+     * Action: Generate Backup
+     */
+    private function actionGenerateBackup(): array
+    {
+        require_once __DIR__ . '/../../src/Services/BackupExporter.php';
+        $exporter = new \App\Services\BackupExporter();
+        
+        $period = $_POST['period'] ?? 'all';
+        $params = [];
+        
+        if ($period === 'month') {
+            $params['year'] = $_POST['year'] ?? date('Y');
+            $params['month'] = $_POST['month'] ?? date('m');
+        } elseif ($period === 'year') {
+            $params['year'] = $_POST['year'] ?? date('Y');
+        }
+        
+        $zipPath = $exporter->generateSharedBackup($period, $params);
+        
+        // Convert to relative URL
+        $basePath = dirname(dirname(__DIR__));
+        $relativeUrl = str_replace($basePath, '', $zipPath);
+        
+        return [
+            'download_url' => $relativeUrl,
+            'filename' => basename($zipPath),
+            'message' => 'Backup erfolgreich erstellt'
+        ];
+    }
+
+    /**
      * Erfolgreiche Response senden
      */
     private function sendSuccess($data)
