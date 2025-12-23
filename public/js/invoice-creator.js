@@ -386,9 +386,11 @@ const InvoiceCreator = {
             // Create invoice via API
             const endpoint = this.currentModule === 'private' 
                 ? '/api/private.php?action=createInvoiceWithPDF' 
-                : '/api/endpoint.php';
+                : '/api/endpoint.php?action=createInvoiceWithPDF';
             
-            const result = await API.postForm(endpoint, formData);
+            const result = this.currentModule === 'private'
+                ? await API.postForm(endpoint, formData)
+                : await API.postShared('createInvoiceWithPDF', Object.fromEntries(formData));
             
             if (result && result.pdf_url) {
                 // Download PDF

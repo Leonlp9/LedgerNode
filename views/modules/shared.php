@@ -180,6 +180,16 @@
         </button>
     </div>
 
+    <!-- Aktionen -->
+    <div class="actions-bar">
+        <button class="btn btn-success" onclick="InvoiceCreator.open('shared', 'invoice')">
+            📝 Rechnung erstellen
+        </button>
+        <button class="btn btn-info" onclick="InvoiceCreator.open('shared', 'credit')">
+            📝 Gutschrift erstellen
+        </button>
+    </div>
+
     <!-- Placeholder content -->
     <div class="card">
         <div class="card-header">
@@ -1226,6 +1236,32 @@ const SharedModule = {
             await this.loadStats();
         } catch (error) {
             App.showToast('Fehler beim Löschen', 'error');
+        }
+    },
+
+    async editYouTubeIncome(id) {
+        try {
+            const incomeData = await API.postShared('getYouTubeIncome', {});
+            const income = incomeData.find(item => item.id === id);
+            
+            if (!income) {
+                App.showToast('Einnahmen nicht gefunden', 'error');
+                return;
+            }
+            
+            // Populate form
+            document.getElementById('yt-income-id').value = income.id;
+            document.getElementById('yt-income-year').value = income.year;
+            document.getElementById('yt-income-month').value = income.month;
+            document.getElementById('yt-income-total').value = income.total_revenue;
+            document.getElementById('yt-income-donations').value = income.donations || 0;
+            document.getElementById('yt-income-members').value = income.members || 0;
+            document.getElementById('yt-income-notes').value = income.notes || '';
+            
+            // Show modal
+            document.getElementById('youtube-income-modal').style.display = 'flex';
+        } catch (error) {
+            App.showToast('Fehler beim Laden', 'error');
         }
     },
 

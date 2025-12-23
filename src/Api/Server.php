@@ -807,6 +807,47 @@ class Server
     }
 
     /**
+     * Action: Create Invoice with PDF
+     */
+    private function actionCreateInvoiceWithPDF(): array
+    {
+        require_once __DIR__ . '/../../src/Services/InvoicePDFGenerator.php';
+        $pdfGenerator = new \App\Services\InvoicePDFGenerator();
+        
+        // Generate PDF
+        $pdfPath = $pdfGenerator->generate($_POST);
+        
+        // Convert relative path to web-accessible path
+        $basePath = dirname(dirname(__DIR__));
+        $relativePath = str_replace($basePath, '', $pdfPath);
+        
+        // Prepare invoice data for database
+        $data = [
+            'type' => $_POST['type'] ?? $_POST['invoice_type'],
+            'invoice_number' => $_POST['invoice_number'],
+            'invoice_date' => $_POST['invoice_date'],
+            'due_date' => $_POST['due_date'] ?? null,
+            'amount' => $_POST['amount'],
+            'sender' => $_POST['sender'],
+            'recipient' => $_POST['recipient'],
+            'description' => $_POST['description'],
+            'file_path' => $pdfPath,
+            'file_name' => basename($pdfPath),
+            'status' => $_POST['status'] ?? 'open',
+            'notes' => $_POST['notes'] ?? null
+        ];
+        
+        $id = $this->db->insertArray('shared_invoices', $data);
+        
+        return [
+            'id' => $id,
+            'message' => 'Rechnung erstellt',
+            'pdf_url' => $relativePath,
+            'pdf_path' => $pdfPath
+        ];
+    }
+
+    /**
      * Erfolgreiche Response senden
      */
     private function sendSuccess($data)
