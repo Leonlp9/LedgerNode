@@ -272,6 +272,12 @@
         <button class="btn btn-primary" onclick="PrivateModule.showAddInvoice()">
             ➕ Neue Rechnung
         </button>
+        <button class="btn btn-success" onclick="InvoiceCreator.open('private', 'invoice')">
+            📝 Rechnung erstellen
+        </button>
+        <button class="btn btn-info" onclick="InvoiceCreator.open('private', 'credit')">
+            📝 Gutschrift erstellen
+        </button>
     </div>
 
     <!-- Rechnungsliste -->

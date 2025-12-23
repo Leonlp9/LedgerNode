@@ -1363,3 +1363,54 @@ a:hover {
     background: #d1fae5;
     color: #065f46;
 }
+
+/* ==========================================
+   INVOICE CREATOR STYLES
+   ========================================== */
+.line-items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+}
+
+.line-items-table thead {
+    background: var(--gray-100);
+}
+
+.line-items-table th,
+.line-items-table td {
+    padding: 8px;
+    border: 1px solid var(--gray-200);
+    text-align: left;
+}
+
+.line-items-table input {
+    border: 1px solid var(--gray-300);
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+}
+
+.line-items-table input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.invoice-totals {
+    background: var(--gray-50);
+    padding: 15px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+}
+
+.total-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+}
+
+.total-final {
+    padding-top: 10px;
+    border-top: 2px solid var(--gray-300);
+    margin-top: 5px;
+    font-size: 1.1rem;
+}
