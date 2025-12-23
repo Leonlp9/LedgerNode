@@ -46,6 +46,7 @@ vendor/
 !vendor/autoload.php
 composer.phar
 composer.lock
+composer-setup.php
 
 # ==========================================
 # Backup-Dateien
