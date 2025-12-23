@@ -1240,3 +1240,22 @@ a:hover {
         grid-template-columns: 1fr;
     }
 }
+
+/* Additional badge styles for accessibility */
+.unlinked-badge,
+.linked-badge {
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.unlinked-badge {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.linked-badge {
+    background: #d1fae5;
+    color: #065f46;
+}

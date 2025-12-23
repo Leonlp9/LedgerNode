@@ -518,8 +518,11 @@ const PrivateModule = {
         await this.updateCharts();
 
         // Setze heutiges Datum als Standard
-        document.getElementById('private-tx-date').valueAsDate = new Date();
-        document.getElementById('private-inv-date').valueAsDate = new Date();
+        const txDateEl = document.getElementById('private-tx-date');
+        if (txDateEl) txDateEl.valueAsDate = new Date();
+        
+        const invDateEl = document.getElementById('private-inv-date');
+        if (invDateEl) invDateEl.valueAsDate = new Date();
     },
 
     initCharts() {
@@ -1055,6 +1058,7 @@ const PrivateModule = {
                             <span class="invoice-number">${this.escapeHtml(inv.invoice_number || 'Ohne Nr.')}</span>
                             <span class="invoice-type-badge ${inv.type}">${inv.type === 'received' ? '📥 Erhalten' : '📤 Geschrieben'}</span>
                             <span class="invoice-status-badge ${inv.status}">${this.getStatusLabel(inv.status)}</span>
+                            ${!inv.is_linked ? '<span class="unlinked-badge">⚠️ Nicht verknüpft</span>' : '<span class="linked-badge">✓ Verknüpft</span>'}
                         </div>
                         <div class="invoice-description">${this.escapeHtml(inv.description)}</div>
                         <div class="invoice-meta">
@@ -1217,10 +1221,16 @@ const PrivateModule = {
         try {
             const action = id ? 'updateInvoice' : 'createInvoice';
             
-            const result = await fetch('/api/private.php?action=' + action, {
+            const response = await fetch('/api/private.php?action=' + action, {
                 method: 'POST',
                 body: formData
-            }).then(res => res.json());
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
 
             if (result.success) {
                 App.showToast(id ? 'Rechnung aktualisiert' : 'Rechnung erstellt', 'success');

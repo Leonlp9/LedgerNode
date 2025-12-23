@@ -165,9 +165,23 @@ class FileUpload
         $realPath = realpath($filepath);
         $uploadDir = realpath($this->config['upload_dir']);
         
-        if ($realPath === false || strpos($realPath, $uploadDir) !== 0) {
+        if ($realPath === false || $uploadDir === false) {
             $this->addError('Ungültiger Dateipfad');
             return false;
+        }
+        
+        // Use str_starts_with for PHP 8+ or manual check for compatibility
+        if (function_exists('str_starts_with')) {
+            if (!str_starts_with($realPath, $uploadDir . DIRECTORY_SEPARATOR)) {
+                $this->addError('Ungültiger Dateipfad');
+                return false;
+            }
+        } else {
+            // Fallback for PHP < 8.0
+            if (substr($realPath, 0, strlen($uploadDir . DIRECTORY_SEPARATOR)) !== $uploadDir . DIRECTORY_SEPARATOR) {
+                $this->addError('Ungültiger Dateipfad');
+                return false;
+            }
         }
 
         if (!unlink($filepath)) {
@@ -213,8 +227,20 @@ class FileUpload
         $uploadDir = realpath($this->config['upload_dir']);
         $filePath = realpath($filepath);
         
-        if ($filePath === false || strpos($filePath, $uploadDir) !== 0) {
+        if ($filePath === false || $uploadDir === false) {
             return '';
+        }
+        
+        // Security check: ensure file is within upload directory
+        if (function_exists('str_starts_with')) {
+            if (!str_starts_with($filePath, $uploadDir . DIRECTORY_SEPARATOR)) {
+                return '';
+            }
+        } else {
+            // Fallback for PHP < 8.0
+            if (substr($filePath, 0, strlen($uploadDir . DIRECTORY_SEPARATOR)) !== $uploadDir . DIRECTORY_SEPARATOR) {
+                return '';
+            }
         }
         
         $relativePath = substr($filePath, strlen($uploadDir) + 1);
@@ -307,6 +333,11 @@ class FileUpload
     {
         // Check actual MIME type from file content
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo === false) {
+            $this->addError('Fileinfo-Erweiterung nicht verfügbar');
+            return false;
+        }
+        
         $detectedMime = finfo_file($finfo, $tmpName);
         finfo_close($finfo);
         
@@ -390,11 +421,20 @@ class FileUpload
         $htaccess = $this->config['upload_dir'] . '/.htaccess';
         if (!file_exists($htaccess)) {
             $content = "# Protect upload directory\n";
-            $content .= "Options -Indexes\n";
-            $content .= "<FilesMatch \"\.(pdf|jpg|jpeg|png|gif)$\">\n";
-            $content .= "    Order Allow,Deny\n";
-            $content .= "    Allow from all\n";
-            $content .= "</FilesMatch>\n";
+            $content .= "Options -Indexes\n\n";
+            $content .= "# Apache 2.4+\n";
+            $content .= "<IfModule mod_authz_core.c>\n";
+            $content .= "    <FilesMatch \"\.(pdf|jpg|jpeg|png|gif)$\">\n";
+            $content .= "        Require all granted\n";
+            $content .= "    </FilesMatch>\n";
+            $content .= "</IfModule>\n\n";
+            $content .= "# Apache 2.2 (fallback)\n";
+            $content .= "<IfModule !mod_authz_core.c>\n";
+            $content .= "    <FilesMatch \"\.(pdf|jpg|jpeg|png|gif)$\">\n";
+            $content .= "        Order Allow,Deny\n";
+            $content .= "        Allow from all\n";
+            $content .= "    </FilesMatch>\n";
+            $content .= "</IfModule>\n";
             file_put_contents($htaccess, $content);
         }
     }
