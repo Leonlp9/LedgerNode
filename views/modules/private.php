@@ -40,6 +40,17 @@
                 <div class="stat-label">Diesen Monat</div>
             </div>
         </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Unverknüpfte Rechnungen</h3>
+                <span class="card-icon">📄</span>
+            </div>
+            <div class="card-body">
+                <div class="stat-value stat-warning" id="private-unlinked-invoices">0</div>
+                <div class="stat-label">Noch nicht zugeordnet</div>
+            </div>
+        </div>
     </div>
 
     <!-- Charts -->
@@ -188,6 +199,227 @@
     </div>
 </div>
 
+<!-- Tab: Rechnungen -->
+<div class="tab-content" id="private-tab-invoices" style="display: none;">
+    <div class="module-header">
+        <h2>Rechnungen</h2>
+        <p class="subtitle">Verwalte deine Rechnungen und Gutschriften</p>
+    </div>
+
+    <!-- Sub-Tabs für Rechnungen -->
+    <div class="invoice-subtabs">
+        <button class="subtab-btn active" data-subtab="all" onclick="PrivateModule.switchInvoiceSubtab('all')">
+            📊 Alle
+        </button>
+        <button class="subtab-btn" data-subtab="received" onclick="PrivateModule.switchInvoiceSubtab('received')">
+            📥 Erhalten
+        </button>
+        <button class="subtab-btn" data-subtab="issued" onclick="PrivateModule.switchInvoiceSubtab('issued')">
+            📤 Geschrieben
+        </button>
+    </div>
+
+    <!-- Aktionen -->
+    <div class="actions-bar">
+        <button class="btn btn-primary" onclick="PrivateModule.showAddInvoice()">
+            ➕ Neue Rechnung
+        </button>
+    </div>
+
+    <!-- Rechnungsliste -->
+    <div class="card">
+        <div class="card-header">
+            <h3 id="private-invoice-list-title">Alle Rechnungen</h3>
+            <button class="btn btn-small" onclick="PrivateModule.loadInvoices()">
+                🔄 Aktualisieren
+            </button>
+        </div>
+        <div class="card-body">
+            <div id="private-invoices-list" class="invoices-list">
+                <!-- Wird dynamisch gefüllt -->
+                <div class="empty-state">
+                    <p>Noch keine Rechnungen vorhanden</p>
+                    <button class="btn btn-primary" onclick="PrivateModule.showAddInvoice()">
+                        Erste Rechnung anlegen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-container" id="private-invoice-pagination" style="display: none;">
+        <div class="pagination-info">
+            <span id="private-invoice-pagination-info">Zeige 0-0 von 0</span>
+        </div>
+        <div class="pagination-controls">
+            <button class="btn btn-small" id="private-invoice-prev-btn" onclick="PrivateModule.prevInvoicePage()" disabled>
+                ‹ Zurück
+            </button>
+            <span class="pagination-pages" id="private-invoice-pages"></span>
+            <button class="btn btn-small" id="private-invoice-next-btn" onclick="PrivateModule.nextInvoicePage()" disabled>
+                Weiter ›
+            </button>
+        </div>
+        <div class="pagination-per-page">
+            <label for="private-invoice-per-page">Pro Seite:</label>
+            <select id="private-invoice-per-page" onchange="PrivateModule.changeInvoicePerPage(this.value)">
+                <option value="15" selected>15</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Neue Rechnung -->
+<div id="private-invoice-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3 id="private-invoice-modal-title">Neue Rechnung</h3>
+            <button class="modal-close" onclick="PrivateModule.closeInvoiceModal()">&times;</button>
+        </div>
+        <form id="private-invoice-form" onsubmit="PrivateModule.submitInvoice(event)" enctype="multipart/form-data">
+            <input type="hidden" id="private-inv-id" name="id">
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="private-inv-type">Typ</label>
+                    <select id="private-inv-type" name="type" required>
+                        <option value="received">Erhalten (Rechnung/Gutschrift die ich bekommen habe)</option>
+                        <option value="issued">Geschrieben (Rechnung/Gutschrift die ich geschrieben habe)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="private-inv-status">Status</label>
+                    <select id="private-inv-status" name="status">
+                        <option value="open">Offen</option>
+                        <option value="paid">Bezahlt</option>
+                        <option value="overdue">Überfällig</option>
+                        <option value="cancelled">Storniert</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="private-inv-number">Rechnungsnummer</label>
+                    <input type="text" 
+                           id="private-inv-number" 
+                           name="invoice_number" 
+                           placeholder="z.B. RE-2024-001">
+                </div>
+
+                <div class="form-group">
+                    <label for="private-inv-amount">Betrag (€)</label>
+                    <input type="number" 
+                           id="private-inv-amount" 
+                           name="amount" 
+                           step="0.01" 
+                           min="0.01" 
+                           placeholder="0.00"
+                           required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="private-inv-date">Rechnungsdatum</label>
+                    <input type="date" 
+                           id="private-inv-date" 
+                           name="invoice_date" 
+                           required>
+                </div>
+
+                <div class="form-group">
+                    <label for="private-inv-due-date">Fälligkeitsdatum</label>
+                    <input type="date" 
+                           id="private-inv-due-date" 
+                           name="due_date">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="private-inv-sender">Von (Absender)</label>
+                    <input type="text" 
+                           id="private-inv-sender" 
+                           name="sender" 
+                           placeholder="Name des Absenders"
+                           required>
+                </div>
+
+                <div class="form-group">
+                    <label for="private-inv-recipient">An (Empfänger)</label>
+                    <input type="text" 
+                           id="private-inv-recipient" 
+                           name="recipient" 
+                           placeholder="Name des Empfängers"
+                           required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="private-inv-description">Beschreibung</label>
+                <textarea id="private-inv-description" 
+                          name="description" 
+                          rows="3" 
+                          placeholder="Beschreibung der Rechnung"
+                          required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="private-inv-notes">Notizen (optional)</label>
+                <textarea id="private-inv-notes" 
+                          name="notes" 
+                          rows="2" 
+                          placeholder="Zusätzliche Notizen"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="private-inv-file">PDF/Bild hochladen</label>
+                <input type="file" 
+                       id="private-inv-file" 
+                       name="file" 
+                       accept=".pdf,.jpg,.jpeg,.png">
+                <small class="form-hint">Erlaubt: PDF, JPG, PNG (max. 10 MB)</small>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="PrivateModule.closeInvoiceModal()">
+                    Abbrechen
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    Speichern
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Rechnung mit Überweisung verknüpfen -->
+<div id="private-invoice-link-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Mit Überweisung verknüpfen</h3>
+            <button class="modal-close" onclick="PrivateModule.closeLinkModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="private-link-invoice-id">
+            <p>Wähle eine Überweisung mit dem gleichen Betrag:</p>
+            <div id="private-available-transactions" class="transactions-list">
+                <div class="loading">Lädt...</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="PrivateModule.closeLinkModal()">
+                Abbrechen
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: Neue Transaktion -->
 <div id="private-transaction-modal" class="modal" style="display: none;">
     <div class="modal-content">
@@ -258,6 +490,14 @@ const PrivateModule = {
         expensesCategories: null
     },
 
+    // Invoice pagination state
+    invoiceState: {
+        currentPage: 1,
+        perPage: 15,
+        totalPages: 1,
+        currentSubtab: 'all'
+    },
+
     async init() {
         console.log('Private Module initialisiert');
         // Registriere Tabs speziell für dieses Modul (stellt sicher, dass App die richtigen Tabs zeigt)
@@ -265,7 +505,8 @@ const PrivateModule = {
             App.registerTabs('private', [
                 { id: 'dashboard', label: 'Dashboard', icon: '📊' },
                 { id: 'transactions', label: 'Transaktionen', icon: '💳' },
-                { id: 'accounts', label: 'Konten', icon: '📁' }
+                { id: 'accounts', label: 'Konten', icon: '📁' },
+                { id: 'invoices', label: 'Rechnungen', icon: '📄' }
             ]);
         }
 
@@ -277,7 +518,11 @@ const PrivateModule = {
         await this.updateCharts();
 
         // Setze heutiges Datum als Standard
-        document.getElementById('private-tx-date').valueAsDate = new Date();
+        const txDateEl = document.getElementById('private-tx-date');
+        if (txDateEl) txDateEl.valueAsDate = new Date();
+        
+        const invDateEl = document.getElementById('private-inv-date');
+        if (invDateEl) invDateEl.valueAsDate = new Date();
     },
 
     initCharts() {
@@ -460,8 +705,7 @@ const PrivateModule = {
 
     async loadStats() {
         // Lade Statistiken aus lokaler DB
-        // TODO: Backend-Endpoint implementieren
-        const stats = await API.get('/api/private/stats');
+        const stats = await API.get('/api/private.php?action=stats');
         
         if (stats) {
             document.getElementById('private-balance').textContent = 
@@ -471,6 +715,13 @@ const PrivateModule = {
             document.getElementById('private-expenses').textContent = 
                 this.formatCurrency(stats.expenses);
         }
+
+        // Lade Rechnungsstatistiken
+        const invoiceStats = await API.get('/api/private.php?action=getInvoiceStats');
+        if (invoiceStats) {
+            document.getElementById('private-unlinked-invoices').textContent = 
+                invoiceStats.unlinked || 0;
+        }
     },
 
     async loadTransactionsPreview() {
@@ -479,7 +730,7 @@ const PrivateModule = {
         
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
-        let transactions = await API.get('/api/private/transactions');
+        let transactions = await API.get('/api/private.php?action=transactions');
 
         // Defensive: falls API etwas anderes als ein Array liefert, konvertieren und warnen
         if (!Array.isArray(transactions)) {
@@ -519,7 +770,7 @@ const PrivateModule = {
         const container = document.getElementById('private-transactions-list');
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
-        let transactions = await API.get('/api/private/transactions');
+        let transactions = await API.get('/api/private.php?action=transactions');
         console.debug('PrivateModule.loadTransactions -> received:', transactions);
 
         // Defensive: falls API etwas anderes als ein Array liefert, konvertieren und warnen
@@ -561,7 +812,7 @@ const PrivateModule = {
 
     async loadAccounts() {
         const select = document.getElementById('private-tx-account');
-        let accounts = await API.get('/api/private/accounts');
+        let accounts = await API.get('/api/private.php?action=accounts');
 
         // Defensive normalization: handle cases where API returns an object/map instead of an array
         if (!Array.isArray(accounts)) {
@@ -769,6 +1020,330 @@ const PrivateModule = {
             await this.loadAccountsManagement();
             await this.loadStats();
         }
+    },
+
+    // ========== Invoice Functions ==========
+
+    async loadInvoices() {
+        const container = document.getElementById('private-invoices-list');
+        container.innerHTML = '<div class="loading">Lädt...</div>';
+
+        const type = this.invoiceState.currentSubtab === 'all' ? null : this.invoiceState.currentSubtab;
+        const params = {
+            page: this.invoiceState.currentPage,
+            per_page: this.invoiceState.perPage
+        };
+        if (type) params.type = type;
+
+        try {
+            const result = await API.get('/api/private.php?action=getInvoices&' + new URLSearchParams(params));
+            
+            if (!result || !result.invoices || result.invoices.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Noch keine Rechnungen vorhanden</p>
+                        <button class="btn btn-primary" onclick="PrivateModule.showAddInvoice()">
+                            Erste Rechnung anlegen
+                        </button>
+                    </div>
+                `;
+                document.getElementById('private-invoice-pagination').style.display = 'none';
+                return;
+            }
+
+            const html = result.invoices.map(inv => `
+                <div class="invoice-item ${inv.is_linked ? 'linked' : 'unlinked'}">
+                    <div class="invoice-info">
+                        <div class="invoice-header">
+                            <span class="invoice-number">${this.escapeHtml(inv.invoice_number || 'Ohne Nr.')}</span>
+                            <span class="invoice-type-badge ${inv.type}">${inv.type === 'received' ? '📥 Erhalten' : '📤 Geschrieben'}</span>
+                            <span class="invoice-status-badge ${inv.status}">${this.getStatusLabel(inv.status)}</span>
+                            ${!inv.is_linked ? '<span class="unlinked-badge">⚠️ Nicht verknüpft</span>' : '<span class="linked-badge">✓ Verknüpft</span>'}
+                        </div>
+                        <div class="invoice-description">${this.escapeHtml(inv.description)}</div>
+                        <div class="invoice-meta">
+                            Von: ${this.escapeHtml(inv.sender)} • An: ${this.escapeHtml(inv.recipient)} • ${this.formatDate(inv.invoice_date)}
+                            ${inv.due_date ? ' • Fällig: ' + this.formatDate(inv.due_date) : ''}
+                        </div>
+                    </div>
+                    <div class="invoice-amount">
+                        ${this.formatCurrency(inv.amount)}
+                    </div>
+                    <div class="invoice-actions">
+                        ${!inv.is_linked ? `
+                            <button class="btn btn-small btn-info" onclick="PrivateModule.showLinkModal(${inv.id})" title="Mit Überweisung verknüpfen">
+                                🔗 Verknüpfen
+                            </button>
+                        ` : `
+                            <span class="linked-indicator" title="Mit Transaktion verknüpft">✓ Verknüpft</span>
+                        `}
+                        ${inv.file_path ? `
+                            <a href="${inv.file_path}" target="_blank" class="btn btn-small btn-secondary" title="Datei anzeigen">
+                                📄 Datei
+                            </a>
+                        ` : ''}
+                        <button class="btn-icon" onclick="PrivateModule.deleteInvoice(${inv.id})" title="Löschen">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+
+            // Update pagination
+            this.updateInvoicePagination(result.pagination);
+
+        } catch (error) {
+            console.error('Fehler beim Laden der Rechnungen:', error);
+            container.innerHTML = `
+                <div class="error-state">
+                    <p>Fehler beim Laden der Rechnungen</p>
+                    <button class="btn btn-small" onclick="PrivateModule.loadInvoices()">
+                        Erneut versuchen
+                    </button>
+                </div>
+            `;
+        }
+    },
+
+    updateInvoicePagination(pagination) {
+        if (!pagination || pagination.total === 0) {
+            document.getElementById('private-invoice-pagination').style.display = 'none';
+            return;
+        }
+
+        document.getElementById('private-invoice-pagination').style.display = 'flex';
+        
+        this.invoiceState.totalPages = pagination.total_pages;
+        
+        // Update info text
+        const start = (pagination.page - 1) * pagination.per_page + 1;
+        const end = Math.min(pagination.page * pagination.per_page, pagination.total);
+        document.getElementById('private-invoice-pagination-info').textContent = 
+            `Zeige ${start}-${end} von ${pagination.total}`;
+
+        // Update buttons
+        const prevBtn = document.getElementById('private-invoice-prev-btn');
+        const nextBtn = document.getElementById('private-invoice-next-btn');
+        
+        prevBtn.disabled = pagination.page <= 1;
+        nextBtn.disabled = pagination.page >= pagination.total_pages;
+
+        // Update page numbers
+        const pagesContainer = document.getElementById('private-invoice-pages');
+        pagesContainer.innerHTML = '';
+        
+        for (let i = 1; i <= pagination.total_pages; i++) {
+            if (i === 1 || i === pagination.total_pages || (i >= pagination.page - 2 && i <= pagination.page + 2)) {
+                const btn = document.createElement('button');
+                btn.className = 'page-btn' + (i === pagination.page ? ' active' : '');
+                btn.textContent = i;
+                btn.onclick = () => this.goToInvoicePage(i);
+                pagesContainer.appendChild(btn);
+            } else if (i === pagination.page - 3 || i === pagination.page + 3) {
+                const dots = document.createElement('span');
+                dots.textContent = '...';
+                dots.className = 'page-dots';
+                pagesContainer.appendChild(dots);
+            }
+        }
+    },
+
+    switchInvoiceSubtab(subtab) {
+        this.invoiceState.currentSubtab = subtab;
+        this.invoiceState.currentPage = 1;
+
+        // Update subtab buttons
+        document.querySelectorAll('.invoice-subtabs .subtab-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.subtab === subtab) {
+                btn.classList.add('active');
+            }
+        });
+
+        // Update title
+        const titles = {
+            'all': 'Alle Rechnungen',
+            'received': 'Erhaltene Rechnungen',
+            'issued': 'Geschriebene Rechnungen'
+        };
+        document.getElementById('private-invoice-list-title').textContent = titles[subtab] || 'Rechnungen';
+
+        this.loadInvoices();
+    },
+
+    goToInvoicePage(page) {
+        this.invoiceState.currentPage = page;
+        this.loadInvoices();
+    },
+
+    nextInvoicePage() {
+        if (this.invoiceState.currentPage < this.invoiceState.totalPages) {
+            this.invoiceState.currentPage++;
+            this.loadInvoices();
+        }
+    },
+
+    prevInvoicePage() {
+        if (this.invoiceState.currentPage > 1) {
+            this.invoiceState.currentPage--;
+            this.loadInvoices();
+        }
+    },
+
+    changeInvoicePerPage(perPage) {
+        this.invoiceState.perPage = parseInt(perPage);
+        this.invoiceState.currentPage = 1;
+        this.loadInvoices();
+    },
+
+    showAddInvoice() {
+        document.getElementById('private-invoice-modal-title').textContent = 'Neue Rechnung';
+        document.getElementById('private-invoice-form').reset();
+        document.getElementById('private-inv-id').value = '';
+        document.getElementById('private-inv-date').valueAsDate = new Date();
+        document.getElementById('private-invoice-modal').style.display = 'flex';
+    },
+
+    closeInvoiceModal() {
+        document.getElementById('private-invoice-modal').style.display = 'none';
+        document.getElementById('private-invoice-form').reset();
+    },
+
+    async submitInvoice(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        const id = formData.get('id');
+
+        try {
+            const action = id ? 'updateInvoice' : 'createInvoice';
+            
+            const response = await fetch('/api/private.php?action=' + action, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+
+            if (result.success) {
+                App.showToast(id ? 'Rechnung aktualisiert' : 'Rechnung erstellt', 'success');
+                this.closeInvoiceModal();
+                await this.loadInvoices();
+                await this.loadStats();
+            } else {
+                throw new Error(result.error || 'Fehler beim Speichern');
+            }
+        } catch (error) {
+            console.error('Fehler:', error);
+            App.showToast('Fehler beim Speichern: ' + error.message, 'error');
+        }
+    },
+
+    async deleteInvoice(id) {
+        if (!await App.confirm('Rechnung wirklich löschen?')) return;
+
+        try {
+            const result = await fetch('/api/private.php?action=deleteInvoice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'id=' + id
+            }).then(res => res.json());
+
+            if (result.success) {
+                App.showToast('Rechnung gelöscht', 'success');
+                await this.loadInvoices();
+                await this.loadStats();
+            } else {
+                throw new Error(result.error || 'Fehler beim Löschen');
+            }
+        } catch (error) {
+            console.error('Fehler:', error);
+            App.showToast('Fehler beim Löschen: ' + error.message, 'error');
+        }
+    },
+
+    async showLinkModal(invoiceId) {
+        document.getElementById('private-link-invoice-id').value = invoiceId;
+        document.getElementById('private-invoice-link-modal').style.display = 'flex';
+
+        const container = document.getElementById('private-available-transactions');
+        container.innerHTML = '<div class="loading">Lädt...</div>';
+
+        try {
+            const transactions = await API.get('/api/private.php?action=getAvailableTransactions&invoice_id=' + invoiceId);
+            
+            if (!transactions || transactions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Keine passenden Transaktionen gefunden</p>
+                        <small>Es werden nur Transaktionen mit dem gleichen Betrag angezeigt, die noch nicht verknüpft sind.</small>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = transactions.map(tx => `
+                <div class="transaction-item ${tx.type}" onclick="PrivateModule.linkInvoiceToTransaction(${invoiceId}, ${tx.id})">
+                    <div class="transaction-info">
+                        <div class="transaction-description">${this.escapeHtml(tx.description)}</div>
+                        <div class="transaction-meta">
+                            ${this.escapeHtml(tx.account_name)} • ${this.formatDate(tx.date)}
+                        </div>
+                    </div>
+                    <div class="transaction-amount ${tx.type}">
+                        ${tx.type === 'income' ? '+' : '-'}${this.formatCurrency(tx.amount)}
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Fehler:', error);
+            container.innerHTML = '<div class="error-state"><p>Fehler beim Laden</p></div>';
+        }
+    },
+
+    closeLinkModal() {
+        document.getElementById('private-invoice-link-modal').style.display = 'none';
+    },
+
+    async linkInvoiceToTransaction(invoiceId, transactionId) {
+        try {
+            const result = await fetch('/api/private.php?action=linkInvoiceToTransaction', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `invoice_id=${invoiceId}&transaction_id=${transactionId}`
+            }).then(res => res.json());
+
+            if (result.success) {
+                App.showToast('Rechnung verknüpft', 'success');
+                this.closeLinkModal();
+                await this.loadInvoices();
+                await this.loadStats();
+            } else {
+                throw new Error(result.error || 'Fehler beim Verknüpfen');
+            }
+        } catch (error) {
+            console.error('Fehler:', error);
+            App.showToast('Fehler beim Verknüpfen: ' + error.message, 'error');
+        }
+    },
+
+    getStatusLabel(status) {
+        const labels = {
+            'open': 'Offen',
+            'paid': 'Bezahlt',
+            'overdue': 'Überfällig',
+            'cancelled': 'Storniert'
+        };
+        return labels[status] || status;
     }
 };
 

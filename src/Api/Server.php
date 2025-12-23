@@ -363,6 +363,244 @@ class Server
     }
 
     /**
+     * Action: Get shared invoices with pagination
+     */
+    private function actionGetSharedInvoices(): array
+    {
+        $type = $_GET['type'] ?? null;
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = min(100, max(1, (int)($_GET['per_page'] ?? 15)));
+        $offset = ($page - 1) * $perPage;
+
+        $where = [];
+        $bindings = [];
+
+        if ($type && in_array($type, ['received', 'issued'])) {
+            $where[] = 'i.type = :type';
+            $bindings[':type'] = $type;
+        }
+
+        $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+
+        // Get total count
+        $countSql = "SELECT COUNT(*) as total FROM shared_invoices i {$whereClause}";
+        $totalResult = $this->db->fetchOne($countSql, $bindings);
+        $total = $totalResult['total'] ?? 0;
+
+        // Get invoices
+        $sql = "
+            SELECT 
+                i.*,
+                t.description as transaction_description,
+                t.amount as transaction_amount,
+                t.date as transaction_date
+            FROM shared_invoices i
+            LEFT JOIN shared_transactions t ON i.transaction_id = t.id
+            {$whereClause}
+            ORDER BY i.invoice_date DESC, i.created_at DESC
+            LIMIT :limit OFFSET :offset
+        ";
+
+        $bindings[':limit'] = $perPage;
+        $bindings[':offset'] = $offset;
+
+        $invoices = $this->db->fetchAll($sql, $bindings);
+
+        return [
+            'invoices' => $invoices,
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => ceil($total / $perPage)
+            ]
+        ];
+    }
+
+    /**
+     * Action: Create shared invoice
+     */
+    private function actionCreateSharedInvoice(): array
+    {
+        $required = ['type', 'invoice_date', 'amount', 'sender', 'recipient', 'description'];
+        foreach ($required as $field) {
+            if (empty($_POST[$field])) {
+                throw new \InvalidArgumentException("Pflichtfeld fehlt: {$field}");
+            }
+        }
+
+        if (!in_array($_POST['type'], ['received', 'issued'])) {
+            throw new \InvalidArgumentException('Ungültiger Typ');
+        }
+
+        if (!is_numeric($_POST['amount']) || $_POST['amount'] <= 0) {
+            throw new \InvalidArgumentException('Ungültiger Betrag');
+        }
+
+        // Handle file upload if provided
+        $filePath = null;
+        $fileName = null;
+
+        if (!empty($_FILES['file']['tmp_name'])) {
+            $fileUpload = new \App\Core\FileUpload([
+                'max_size' => 10485760,
+                'allowed_types' => ['pdf', 'jpg', 'jpeg', 'png'],
+                'allowed_mimes' => ['application/pdf', 'image/jpeg', 'image/png'],
+                'filename_strategy' => 'hash'
+            ]);
+
+            $uploadedPath = $fileUpload->upload($_FILES['file']);
+            if ($uploadedPath === false) {
+                $errors = implode(', ', $fileUpload->getErrors());
+                throw new \RuntimeException("Datei-Upload fehlgeschlagen: {$errors}");
+            }
+            $filePath = $uploadedPath;
+            $fileName = $_FILES['file']['name'];
+        }
+
+        $data = [
+            'type' => $_POST['type'],
+            'invoice_number' => $_POST['invoice_number'] ?? null,
+            'invoice_date' => $_POST['invoice_date'],
+            'due_date' => $_POST['due_date'] ?? null,
+            'amount' => $_POST['amount'],
+            'sender' => $_POST['sender'],
+            'recipient' => $_POST['recipient'],
+            'description' => $_POST['description'],
+            'file_path' => $filePath,
+            'file_name' => $fileName,
+            'status' => $_POST['status'] ?? 'open',
+            'notes' => $_POST['notes'] ?? null,
+            'created_at' => date('Y-m-d H:i:s')
+        ];
+
+        $id = $this->db->insertArray('shared_invoices', $data);
+
+        return [
+            'id' => $id,
+            'message' => 'Rechnung erfolgreich erstellt'
+        ];
+    }
+
+    /**
+     * Action: Link invoice to transaction
+     */
+    private function actionLinkInvoiceToTransaction(): array
+    {
+        $invoiceId = (int)($_POST['invoice_id'] ?? 0);
+        $transactionId = (int)($_POST['transaction_id'] ?? 0);
+
+        if ($invoiceId <= 0 || $transactionId <= 0) {
+            throw new \InvalidArgumentException('Ungültige IDs');
+        }
+
+        // Check if transaction is already linked
+        $existing = $this->db->fetchOne(
+            'SELECT * FROM shared_invoices WHERE transaction_id = :tid AND id != :id',
+            [':tid' => $transactionId, ':id' => $invoiceId]
+        );
+        if ($existing) {
+            throw new \RuntimeException('Transaktion ist bereits mit einer anderen Rechnung verknüpft');
+        }
+
+        $this->db->execute(
+            'UPDATE shared_invoices SET transaction_id = :tid, is_linked = TRUE WHERE id = :id',
+            [':tid' => $transactionId, ':id' => $invoiceId]
+        );
+
+        return ['message' => 'Rechnung mit Transaktion verknüpft'];
+    }
+
+    /**
+     * Action: Get available transactions for linking
+     */
+    private function actionGetAvailableTransactionsForInvoice(): array
+    {
+        $invoiceId = (int)($_GET['invoice_id'] ?? 0);
+
+        if ($invoiceId <= 0) {
+            throw new \InvalidArgumentException('Ungültige Rechnungs-ID');
+        }
+
+        $invoice = $this->db->fetchOne('SELECT * FROM shared_invoices WHERE id = :id', [':id' => $invoiceId]);
+        if (!$invoice) {
+            throw new \RuntimeException('Rechnung nicht gefunden');
+        }
+
+        $transactionType = $invoice['type'] === 'received' ? 'income' : 'expense';
+
+        $sql = "
+            SELECT t.*, a.name as account_name
+            FROM shared_transactions t
+            LEFT JOIN shared_accounts a ON t.account_id = a.id
+            WHERE t.type = :type
+              AND t.amount = :amount
+              AND t.id NOT IN (SELECT transaction_id FROM shared_invoices WHERE transaction_id IS NOT NULL AND id != :invoice_id)
+            ORDER BY t.date DESC
+            LIMIT 50
+        ";
+
+        return $this->db->fetchAll($sql, [
+            ':type' => $transactionType,
+            ':amount' => $invoice['amount'],
+            ':invoice_id' => $invoiceId
+        ]);
+    }
+
+    /**
+     * Action: Get invoice statistics
+     */
+    private function actionGetSharedInvoiceStats(): array
+    {
+        $stats = $this->db->fetchOne("
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN type = 'received' THEN 1 ELSE 0 END) as received,
+                SUM(CASE WHEN type = 'issued' THEN 1 ELSE 0 END) as issued,
+                SUM(CASE WHEN is_linked = FALSE THEN 1 ELSE 0 END) as unlinked,
+                SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_count,
+                SUM(amount) as total_amount
+            FROM shared_invoices
+        ");
+
+        return $stats ?: [
+            'total' => 0,
+            'received' => 0,
+            'issued' => 0,
+            'unlinked' => 0,
+            'open_count' => 0,
+            'total_amount' => 0
+        ];
+    }
+
+    /**
+     * Action: Delete shared invoice
+     */
+    private function actionDeleteSharedInvoice(): array
+    {
+        $id = (int)($_POST['id'] ?? 0);
+
+        if ($id <= 0) {
+            throw new \InvalidArgumentException('Ungültige ID');
+        }
+
+        $invoice = $this->db->fetchOne('SELECT * FROM shared_invoices WHERE id = :id', [':id' => $id]);
+        if (!$invoice) {
+            throw new \RuntimeException('Rechnung nicht gefunden');
+        }
+
+        // Delete file if exists
+        if ($invoice['file_path'] && file_exists($invoice['file_path'])) {
+            $fileUpload = new \App\Core\FileUpload();
+            $fileUpload->delete($invoice['file_path']);
+        }
+
+        $this->db->execute('DELETE FROM shared_invoices WHERE id = :id', [':id' => $id]);
+
+        return ['message' => 'Rechnung gelöscht'];
+    }
+
+    /**
      * Erfolgreiche Response senden
      */
     private function sendSuccess($data)

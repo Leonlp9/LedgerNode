@@ -75,6 +75,35 @@ INSERT INTO private_transactions (account_id, type, amount, description, categor
     (1, 'expense', 45.00, 'Tankstelle', 'Transport', date('now', '-2 days')),
     (3, 'expense', 15.50, 'Kino-Tickets', 'Unterhaltung', date('now', '-3 days'));
 
+-- Rechnungen (Invoices)
+CREATE TABLE IF NOT EXISTS private_invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT CHECK(type IN ('received', 'issued')) NOT NULL,
+    invoice_number TEXT,
+    invoice_date TEXT NOT NULL,
+    due_date TEXT,
+    amount REAL NOT NULL,
+    sender TEXT,
+    recipient TEXT,
+    description TEXT,
+    file_path TEXT,
+    file_name TEXT,
+    transaction_id INTEGER,
+    is_linked INTEGER DEFAULT 0,
+    status TEXT CHECK(status IN ('open', 'paid', 'overdue', 'cancelled')) DEFAULT 'open',
+    notes TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (transaction_id) REFERENCES private_transactions(id) ON DELETE SET NULL
+);
+
+-- Indizes für Rechnungen
+CREATE INDEX IF NOT EXISTS idx_invoices_type ON private_invoices(type);
+CREATE INDEX IF NOT EXISTS idx_invoices_date ON private_invoices(invoice_date);
+CREATE INDEX IF NOT EXISTS idx_invoices_linked ON private_invoices(is_linked);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON private_invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_transaction ON private_invoices(transaction_id);
+
 -- Trigger für updated_at (simuliert ON UPDATE CURRENT_TIMESTAMP)
 CREATE TRIGGER IF NOT EXISTS update_private_accounts_timestamp 
 AFTER UPDATE ON private_accounts
@@ -86,4 +115,10 @@ CREATE TRIGGER IF NOT EXISTS update_private_transactions_timestamp
 AFTER UPDATE ON private_transactions
 BEGIN
     UPDATE private_transactions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_private_invoices_timestamp 
+AFTER UPDATE ON private_invoices
+BEGIN
+    UPDATE private_invoices SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
