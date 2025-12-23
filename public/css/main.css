@@ -552,10 +552,13 @@ a:hover {
     background: white;
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-xl);
-    max-width: 500px;
+    max-width: 700px; /* begrenze Breite für normale Modale */
     width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
+    position: relative; /* nicht full-screen, zentriert durch .modal (flex) */
+    margin: 0 auto; /* zentriert in der Modal-Overlay-Box */
+    max-height: calc(100vh - 120px); /* Platz für Header/Footer und etwas Abstand */
+    overflow: auto; /* interne Inhalte scrollen */
+    z-index: 1101;
 }
 
 .modal-header {
@@ -564,7 +567,6 @@ a:hover {
     justify-content: space-between;
     padding: var(--spacing-lg);
     border-bottom: 1px solid var(--gray-200);
-    padding: var(--spacing-lg);
     background: linear-gradient(90deg, rgba(59,130,246,0.06), rgba(99,102,241,0.03));
     border-top-left-radius: var(--radius-xl);
     border-top-right-radius: var(--radius-xl);
@@ -626,6 +628,108 @@ a:hover {
 .modal-body {
     padding: var(--spacing-lg);
     color: var(--gray-700);
+}
+
+/* Fullscreen overrides for the invoice viewer modal */
+#private-invoice-viewer-modal {
+    padding: 0; /* remove outer padding so modal-content can touch edges */
+    align-items: stretch;
+    justify-content: center;
+    z-index: 1100; /* bring above default modals */
+    background: rgba(0,0,0,0.85); /* stronger overlay */
+}
+
+#private-invoice-viewer-modal .modal-content {
+    background: white; /* keep content visible */
+    border-radius: 0; /* no rounded corners */
+    box-shadow: none; /* no outer shadow so it blends to edges */
+    width: 100%;
+    max-width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+    /* Allow scrolling when content is taller than viewport */
+    overflow: auto;
+    z-index: 1101;
+}
+
+/* Make the inner body scrollable so header/footer stay in view */
+#private-invoice-viewer-modal .modal-body {
+    overflow: auto;
+}
+
+/* Ensure modal-close sits above content */
+#private-invoice-viewer-modal .modal-close {
+    position: relative;
+    z-index: 1200;
+}
+
+/* Viewer layout tweaks: keep left file viewer fixed, allow right sidebar to scroll */
+#private-invoice-viewer-modal .viewer-modal-body {
+    display: flex;
+    gap: 16px;
+    height: 100%;
+}
+
+#private-invoice-viewer-modal .viewer-file {
+    flex: 1 1 auto;
+    min-width: 0; /* allow shrinking within flexbox */
+    /* keep the embedded document fixed to its container size and allow it to fill vertically */
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden; /* do not scroll the left viewer itself */
+}
+
+#private-invoice-viewer-modal .viewer-file iframe,
+#private-invoice-viewer-modal .viewer-file object {
+    height: 100%;
+    width: 100%;
+    display: block;
+}
+
+#private-invoice-viewer-modal .viewer-sidebar {
+    flex: 0 0 360px; /* fixed width for sidebar */
+    max-width: 40%;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: auto; /* only the right sidebar scrolls */
+    background: #ffffff; /* keep same background */
+    border-left: 1px solid var(--gray-100);
+    padding-left: 12px;
+}
+
+/* Ensure form inside sidebar stretches and footer stays at bottom if needed */
+#private-invoice-viewer-modal .viewer-sidebar .modal-footer {
+    margin-top: auto;
+}
+
+/* Responsive: on narrow screens stack viewer above sidebar and allow normal flow scrolling */
+@media (max-width: 900px) {
+    #private-invoice-viewer-modal .viewer-modal-body {
+        flex-direction: column;
+        align-items: stretch;
+        overflow: auto;
+    }
+
+    #private-invoice-viewer-modal .viewer-sidebar {
+        max-width: 100%;
+        width: 100%;
+        min-width: 0;
+        border-left: none;
+        border-top: 1px solid var(--gray-100);
+    }
+
+    #private-invoice-viewer-modal .viewer-file {
+        height: 60vh; /* give viewer some height on small screens */
+    }
 }
 
 /* ==========================================

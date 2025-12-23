@@ -47,14 +47,15 @@ class PrivateInvoices
         $bindings = [];
 
         if ($type && in_array($type, ['received', 'issued'])) {
-            $where[] = 'type = :type';
+            // Qualify column with invoice alias to avoid ambiguity with transaction.type
+            $where[] = 'i.type = :type';
             $bindings[':type'] = $type;
         }
 
         $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
-        // Get total count
-        $countSql = "SELECT COUNT(*) as total FROM private_invoices {$whereClause}";
+        // Get total count (use alias i for consistency)
+        $countSql = "SELECT COUNT(*) as total FROM private_invoices i {$whereClause}";
         $totalResult = $this->db->fetchOne($countSql, $bindings);
         $total = $totalResult['total'] ?? 0;
 
@@ -77,8 +78,20 @@ class PrivateInvoices
 
         $invoices = $this->db->fetchAll($sql, $bindings);
 
+        // Map filesystem paths to web URLs for client consumption
+        $mapped = array_map(function($inv) {
+            if (!empty($inv['file_path'])) {
+                $url = $this->fileUpload->getFileUrl($inv['file_path']);
+                $inv['file_url'] = $url;
+            } else {
+                $inv['file_url'] = null;
+            }
+            // For backward compatibility keep file_path (filesystem) but clients should use file_url
+            return $inv;
+        }, $invoices ?: []);
+
         return [
-            'invoices' => $invoices,
+            'invoices' => $mapped,
             'pagination' => [
                 'page' => $page,
                 'per_page' => $perPage,
@@ -104,7 +117,14 @@ class PrivateInvoices
             WHERE i.id = :id
         ";
 
-        return $this->db->fetchOne($sql, [':id' => $id]);
+        $inv = $this->db->fetchOne($sql, [':id' => $id]);
+        if ($inv && !empty($inv['file_path'])) {
+            $inv['file_url'] = $this->fileUpload->getFileUrl($inv['file_path']);
+        } else {
+            $inv['file_url'] = null;
+        }
+
+        return $inv;
     }
 
     /**
@@ -306,17 +326,21 @@ class PrivateInvoices
         }
 
         // Determine transaction type based on invoice type
-        $transactionType = $invoice['type'] === 'received' ? 'income' : 'expense';
+        // received invoice = you received a bill to pay = expense
+        // issued invoice = you issued a bill to receive payment = income
+        $transactionType = $invoice['type'] === 'received' ? 'expense' : 'income';
 
+        // Get all transactions of the correct type that are not linked to other invoices
         $sql = "
-            SELECT t.*, a.name as account_name
+            SELECT t.*, a.name as account_name,
+                   CASE WHEN ABS(t.amount - :amount) < 0.01 THEN 1 ELSE 0 END as is_matching_amount
             FROM private_transactions t
             LEFT JOIN private_accounts a ON t.account_id = a.id
+            LEFT JOIN private_invoices inv ON inv.transaction_id = t.id AND inv.id != :invoice_id
             WHERE t.type = :type
-              AND t.amount = :amount
-              AND t.id NOT IN (SELECT transaction_id FROM private_invoices WHERE transaction_id IS NOT NULL AND id != :invoice_id)
-            ORDER BY t.date DESC
-            LIMIT 50
+              AND inv.id IS NULL
+            ORDER BY is_matching_amount DESC, t.date DESC
+            LIMIT 100
         ";
 
         return $this->db->fetchAll($sql, [

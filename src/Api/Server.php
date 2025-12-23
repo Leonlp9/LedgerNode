@@ -406,8 +406,19 @@ class Server
 
         $invoices = $this->db->fetchAll($sql, $bindings);
 
+        // After fetching, map file_path -> file_url using FileUpload
+        $fileUpload = new \App\Core\FileUpload();
+        $mapped = array_map(function($inv) use ($fileUpload) {
+            if (!empty($inv['file_path'])) {
+                $inv['file_url'] = $fileUpload->getFileUrl($inv['file_path']);
+            } else {
+                $inv['file_url'] = null;
+            }
+            return $inv;
+        }, $invoices ?: []);
+
         return [
-            'invoices' => $invoices,
+            'invoices' => $mapped,
             'pagination' => [
                 'page' => $page,
                 'per_page' => $perPage,

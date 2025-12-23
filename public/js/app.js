@@ -229,6 +229,9 @@ const App = {
                         try { await PrivateModule.loadAccountsManagement(); } catch (e) { console.warn('PrivateModule.loadAccountsManagement failed', e); }
                     } else if (tabId === 'transactions') {
                         try { await PrivateModule.loadTransactions(); } catch (e) { console.warn('PrivateModule.loadTransactions failed', e); }
+                    } else if (tabId === 'invoices') {
+                        // Beim Anzeigen des Rechnungen-Tabs automatisch die Liste laden
+                        try { await PrivateModule.loadInvoices(); } catch (e) { console.warn('PrivateModule.loadInvoices failed', e); }
                     }
                 }
 
