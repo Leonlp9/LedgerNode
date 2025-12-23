@@ -914,8 +914,12 @@ const PrivateModule = {
         // Show only last 5 transactions for preview
         const previewTransactions = transactions.slice(0, 5);
 
+        // Ensure we have a map for quick access later (so details can open without reloading full list)
+        this.lastTransactions = this.lastTransactions || {};
+        previewTransactions.forEach(tx => this.lastTransactions[tx.id] = tx);
+
         const html = previewTransactions.map(tx => `
-            <div class="transaction-item ${tx.type}">
+            <div class="transaction-item ${tx.type}" onclick="PrivateModule.openLinkedTransaction(${tx.id})" style="cursor: pointer;">
                 <div class="transaction-info">
                     <div class="transaction-description">${this.escapeHtml(tx.description)}</div>
                     <div class="transaction-meta">
