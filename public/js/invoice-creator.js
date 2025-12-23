@@ -360,7 +360,7 @@ const InvoiceCreator = {
             
             // Add line items
             data.line_items = JSON.stringify(this.lineItems);
-            
+
             // Calculate totals
             let subtotal = 0;
             let taxTotal = 0;
@@ -372,17 +372,17 @@ const InvoiceCreator = {
             data.amount = (subtotal + taxTotal).toFixed(2);
             data.subtotal = subtotal.toFixed(2);
             data.tax_total = taxTotal.toFixed(2);
-            
+
             // Create description from line items
             const descriptions = this.lineItems.map(item => item.description).filter(d => d);
             data.description = descriptions.join(', ') || 'Rechnung';
-            
+
             // Set type based on invoice_type
             data.type = data.invoice_type; // 'issued' or 'received'
-            
+
             // Set status
             data.status = 'open';
-            
+
             // Create invoice via API
             const endpoint = this.currentModule === 'private' 
                 ? '/api/private.php?action=createInvoiceWithPDF' 
@@ -400,7 +400,7 @@ const InvoiceCreator = {
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                
+
                 if (typeof App !== 'undefined') {
                     App.showToast('✅ Rechnung erstellt und PDF heruntergeladen', 'success');
                 }

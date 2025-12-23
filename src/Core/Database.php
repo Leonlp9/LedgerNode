@@ -299,4 +299,36 @@ class Database
             break;
         }
     }
+
+    /**
+     * Hilfsmethode: Gibt einen datenbank-spezifischen Ausdruck zurück, der ein Datum formatiert.
+     *
+     * $format erwartet SQLite/strftime-Style Formate wie '%Y', '%m', '%Y-%m' (MySQLs DATE_FORMAT nutzt dieselben Format-Tokens in der häufigen Nutzung).
+     * Wenn $isUnix true ist, wird in SQLite der 'unixepoch' Modifier benutzt und in MySQL FROM_UNIXTIME() gewrappt.
+     *
+     * @param string $column Spaltenname oder Ausdruck (ohne Bindestriche/Quotes)
+     * @param string $format Format-String in strftime-Form (z. B. '%Y')
+     * @param bool $isUnix Ob die Spalte ein Unix-Epoch-Integer ist
+     * @return string SQL-Ausdruck
+     */
+    public function dateFormatExpr(string $column, string $format, bool $isUnix = false): string
+    {
+        $driver = $this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'sqlite') {
+            $expr = "strftime('" . $format . "', " . $column;
+            if ($isUnix) {
+                $expr .= ", 'unixepoch'";
+            }
+            $expr .= ")";
+            return $expr;
+        }
+
+        // Default / MySQL
+        if ($isUnix) {
+            return "DATE_FORMAT(FROM_UNIXTIME(" . $column . "), '" . $format . "')";
+        }
+
+        return "DATE_FORMAT(" . $column . ", '" . $format . "')";
+    }
 }

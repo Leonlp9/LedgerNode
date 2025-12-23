@@ -146,14 +146,14 @@ try {
             // Convert relative path to web-accessible path
             $basePath = dirname(__DIR__);
             $relativePath = str_replace($basePath, '', $pdfPath);
-            
+
             // Create file array for PrivateInvoices handler
             $fakeFile = null;
             if (file_exists($pdfPath)) {
                 $invoiceData['file_path'] = $relativePath;
                 $invoiceData['file_name'] = basename($pdfPath);
             }
-            
+
             $result = $handler->createInvoice($invoiceData, $fakeFile);
             
             // Return success with PDF URL
@@ -184,14 +184,59 @@ try {
             }
             
             $zipPath = $exporter->generatePrivateBackup($period, $params);
-            
-            // Convert to relative URL
+
+            // Ensure the file is web-accessible: copy/move into public/backups if necessary
             $basePath = dirname(__DIR__);
-            $relativeUrl = str_replace($basePath, '', $zipPath);
-            
+            $publicBackups = $basePath . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'backups';
+            if (!is_dir($publicBackups)) {
+                @mkdir($publicBackups, 0755, true);
+            }
+
+            if (!file_exists($zipPath)) {
+                throw new RuntimeException('Erstelltes Archiv konnte nicht gefunden werden: ' . $zipPath);
+            }
+
+            $filename = basename($zipPath);
+            $destPath = $publicBackups . DIRECTORY_SEPARATOR . $filename;
+
+            // Wenn die Datei nicht bereits im public/backups liegt, kopieren
+            if (realpath($zipPath) !== realpath($destPath)) {
+                if (!@copy($zipPath, $destPath)) {
+                    // Falls copy fehlschlägt, versuche mit rename (move)
+                    if (!@rename($zipPath, $destPath)) {
+                        // Wenn beides fehlschlägt, gib eine aussagekräftige Fehlermeldung
+                        throw new RuntimeException('Archiv konnte nicht in das öffentliche Verzeichnis kopiert werden. Pfad: ' . $zipPath);
+                    }
+                } else {
+                    // Optional: lösche die Originaldatei im temp, falls wir kopiert haben
+                    if (is_writable(dirname($zipPath))) {
+                        @unlink($zipPath);
+                    }
+                }
+            }
+
+            // Erzeuge eine HTTP-URL, indem der Pfad relativ zum DOCUMENT_ROOT gesetzt wird
+            $fullUrl = null;
+            $docRoot = realpath($_SERVER['DOCUMENT_ROOT'] ?? '');
+            $destReal = realpath($destPath);
+            if ($docRoot && $destReal && strpos($destReal, $docRoot) === 0) {
+                $urlPath = str_replace('\\', '/', substr($destReal, strlen($docRoot)));
+                if (substr($urlPath, 0, 1) !== '/') $urlPath = '/' . $urlPath;
+                $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? 'localhost');
+                $fullUrl = $scheme . '://' . $host . $urlPath;
+            }
+
+            // Fallback: relative URL innerhalb der App (slash-normalisiert)
+            $relativeUrl = str_replace($basePath, '', $destPath);
+            $relativeUrl = str_replace('\\', '/', $relativeUrl);
+            if (substr($relativeUrl, 0, 1) !== '/') {
+                $relativeUrl = '/' . $relativeUrl;
+            }
+
             sendSuccess([
-                'download_url' => $relativeUrl,
-                'filename' => basename($zipPath),
+                'download_url' => $fullUrl ?? $relativeUrl,
+                'filename' => $filename,
                 'message' => 'Backup erfolgreich erstellt'
             ]);
             break;
@@ -265,7 +310,7 @@ try {
 } catch (Throwable $e) {
     // Log the full error for debugging
     error_log('Private API Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-    
+
     // Return sanitized error message to user
     http_response_code(500);
     $userMessage = 'Ein Fehler ist aufgetreten';

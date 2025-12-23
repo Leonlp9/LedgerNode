@@ -5,8 +5,35 @@
  * Lädt die Anwendung und zeigt das UI
  */
 
+// Prüfe, ob Composer-Autoloader vorhanden ist und vollständig generiert wurde.
+$vendorAutoload = __DIR__ . '/vendor/autoload.php';
+$composerAutoloadReal = __DIR__ . '/vendor/composer/autoload_real.php';
+if (!file_exists($vendorAutoload) || !file_exists($composerAutoloadReal)) {
+    http_response_code(500);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html>';
+    echo '<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+    echo '<title>LedgerNode — Abhängigkeiten fehlen</title>';
+    echo '<style>body{font-family:Arial,Helvetica,sans-serif;background:#f7f7f7;color:#222;padding:40px} .card{max-width:900px;margin:40px auto;background:#fff;padding:24px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06)} h1{margin-top:0;color:#c0392b} p{line-height:1.5} .hint{background:#f1f1f1;padding:10px;border-radius:4px;font-size:0.95em} code{background:#eee;padding:2px 6px;border-radius:4px;font-family:monospace}</style>';
+    echo '</head><body><div class="card">';
+    echo '<h1>Abhängigkeiten nicht installiert</h1>';
+    echo '<p>Der Composer-Autoloader oder dessen generierte Dateien fehlen. Die Anwendung kann nicht gestartet werden, bis die Abhängigkeiten installiert sind.</p>';
+    echo '<h2>Was zu tun ist</h2>';
+    echo '<ol>';
+    echo '<li>Stellen Sie sicher, dass <code>composer</code> installiert ist: <code>composer --version</code>.</li>';
+    echo '<li>Führen Sie im Projektstamm folgendes aus (PowerShell / CMD):</li>';
+    echo '<li class="hint"><code>cd ' . htmlspecialchars(__DIR__, ENT_QUOTES|ENT_SUBSTITUTE, 'UTF-8') . ' ; composer install</code></li>';
+    echo '<li>Wenn Sie Composer nicht verwenden möchten, stellen Sie sicher, dass der Ordner <code>vendor/</code> vollständig vorhanden ist (inkl. <code>vendor/composer/autoload_real.php</code>).</li>';
+    echo '<li>Prüfen Sie außerdem, ob <code>config.php</code> existiert (kopieren Sie ggf. <code>config.example.php</code> zu <code>config.php</code> und passen Sie die Datenbankeinstellungen an).</li>';
+    echo '</ol>';
+    echo '<p>Nach Installation der Abhängigkeiten oder Anlegen der Konfigurationsdatei laden Sie die Seite neu.</p>';
+    echo '<p style="font-size:.9em;color:#666">Falls das Problem weiterhin besteht: Prüfen Sie die Datei <code>vendor/autoload.php</code> auf fehlende <code>vendor/composer/autoload_real.php</code> oder lesen Sie die README.</p>';
+    echo '</div></body></html>';
+    exit(1);
+}
+
 // Autoloader (composer oder eigener)
-require_once __DIR__ . '/vendor/autoload.php';
+require_once $vendorAutoload;
 
 use App\Core\Config;
 use App\Core\Security;
