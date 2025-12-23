@@ -131,6 +131,30 @@
             </div>
         </div>
     </div>
+
+    <!-- Pagination für Transaktionen -->
+    <div class="pagination-container" id="private-transaction-pagination" style="display: none;">
+        <div class="pagination-info">
+            <span id="private-transaction-pagination-info">Zeige 0-0 von 0</span>
+        </div>
+        <div class="pagination-controls">
+            <button class="btn btn-small" id="private-transaction-prev-btn" onclick="PrivateModule.prevTransactionPage()" disabled>
+                ‹ Zurück
+            </button>
+            <span class="pagination-pages" id="private-transaction-pages"></span>
+            <button class="btn btn-small" id="private-transaction-next-btn" onclick="PrivateModule.nextTransactionPage()" disabled>
+                Weiter ›
+            </button>
+        </div>
+        <div class="pagination-per-page">
+            <label for="private-transaction-per-page">Pro Seite:</label>
+            <select id="private-transaction-per-page" onchange="PrivateModule.changeTransactionPerPage(this.value)">
+                <option value="15" selected>15</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+    </div>
 </div>
 
 <!-- Tab: Konten verwalten -->
@@ -165,6 +189,30 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Pagination für Konten -->
+    <div class="pagination-container" id="private-account-pagination" style="display: none;">
+        <div class="pagination-info">
+            <span id="private-account-pagination-info">Zeige 0-0 von 0</span>
+        </div>
+        <div class="pagination-controls">
+            <button class="btn btn-small" id="private-account-prev-btn" onclick="PrivateModule.prevAccountPage()" disabled>
+                ‹ Zurück
+            </button>
+            <span class="pagination-pages" id="private-account-pages"></span>
+            <button class="btn btn-small" id="private-account-next-btn" onclick="PrivateModule.nextAccountPage()" disabled>
+                Weiter ›
+            </button>
+        </div>
+        <div class="pagination-per-page">
+            <label for="private-account-per-page">Pro Seite:</label>
+            <select id="private-account-per-page" onchange="PrivateModule.changeAccountPerPage(this.value)">
+                <option value="15" selected>15</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
         </div>
     </div>
 </div>
@@ -663,6 +711,20 @@ const PrivateModule = {
     // Map to keep last loaded invoices by id (used by viewer)
     lastInvoices: {},
 
+    // Transactions pagination state
+    transactionState: {
+        currentPage: 1,
+        perPage: 15,
+        totalPages: 1
+    },
+
+    // Accounts pagination state
+    accountState: {
+        currentPage: 1,
+        perPage: 15,
+        totalPages: 1
+    },
+
     async init() {
         console.log('Private Module initialisiert');
         // Registriere Tabs speziell für dieses Modul (stellt sicher, dass App die richtigen Tabs zeigt)
@@ -939,65 +1001,144 @@ const PrivateModule = {
         const container = document.getElementById('private-transactions-list');
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
-        let transactions = await API.get('/api/private.php?action=transactions');
-        console.debug('PrivateModule.loadTransactions -> received:', transactions);
+        // Build limit/offset from transactionState (endpoint /api/private/transactions expects limit/offset)
+        const params = {
+            limit: this.transactionState.perPage,
+            offset: (this.transactionState.currentPage - 1) * this.transactionState.perPage
+        };
 
-        // Defensive: falls API etwas anderes als ein Array liefert, konvertieren und warnen
-        if (!Array.isArray(transactions)) {
-            console.warn('PrivateModule.loadTransactions: transactions is not an array, normalizing to []');
-            transactions = Array.isArray(transactions?.data) ? transactions.data : [];
-        }
+        try {
+            // Prefer the more modern endpoint which supports limit/offset
+            const result = await API.get('/api/private/transactions', params);
+            console.debug('PrivateModule.loadTransactions -> received:', result);
 
-        if (!transactions || transactions.length === 0) {
+            // Normalize both paginated and non-paginated responses
+            let transactions = [];
+            let pagination = null;
+
+            if (Array.isArray(result)) {
+                transactions = result;
+            } else if (result && Array.isArray(result.transactions)) {
+                transactions = result.transactions;
+                pagination = result.pagination || null;
+            } else if (Array.isArray(result?.data)) {
+                transactions = result.data;
+                pagination = result.pagination || null;
+            }
+
+            if (!transactions || transactions.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Noch keine Transaktionen vorhanden</p>
+                    </div>
+                `;
+                document.getElementById('private-transaction-pagination').style.display = 'none';
+                return;
+            }
+
+            // Store transactions for detail view
+            this.lastTransactions = {};
+            transactions.forEach(tx => this.lastTransactions[tx.id] = tx);
+
+            const html = transactions.map(tx => `
+                <div class="transaction-item ${tx.type}" onclick="PrivateModule.openTransactionDetail(${tx.id})" style="cursor: pointer;">
+                    <div class="transaction-info">
+                        <div class="transaction-description">${this.escapeHtml(tx.description)}</div>
+                        <div class="transaction-meta">
+                            ${tx.account_name} • ${this.formatDate(tx.date)}
+                        </div>
+                    </div>
+                    <div class="transaction-amount ${tx.type}">
+                        ${tx.type === 'income' ? '+' : '-'}${this.formatCurrency(tx.amount)}
+                    </div>
+                    <div class="transaction-actions">
+                        <button class="btn-icon" onclick="event.stopPropagation(); PrivateModule.deleteTransaction(${tx.id})" title="Löschen">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+
+            // If backend returned raw array (no pagination), normalize to a single page
+            if (!pagination) {
+                pagination = { total: transactions.length, page: 1, per_page: transactions.length, total_pages: 1 };
+            }
+            // Update pagination
+            this.updateTransactionPagination(pagination);
+         } catch (error) {
+            console.error('Fehler beim Laden der Transaktionen:', error);
             container.innerHTML = `
-                <div class="empty-state">
-                    <p>Noch keine Transaktionen vorhanden</p>
+                <div class="error-state">
+                    <p>Fehler beim Laden der Transaktionen</p>
+                    <button class="btn btn-small" onclick="PrivateModule.loadTransactions()">
+                        Erneut versuchen
+                    </button>
                 </div>
             `;
+        }
+    },
+
+    updateTransactionPagination(pagination) {
+        if (!pagination || pagination.total === 0) {
+            document.getElementById('private-transaction-pagination').style.display = 'none';
             return;
         }
 
-        // Store transactions for detail view
-        this.lastTransactions = {};
-        transactions.forEach(tx => this.lastTransactions[tx.id] = tx);
+        document.getElementById('private-transaction-pagination').style.display = 'flex';
+        this.transactionState.totalPages = pagination.total_pages;
 
-        const html = transactions.map(tx => `
-            <div class="transaction-item ${tx.type}" onclick="PrivateModule.openTransactionDetail(${tx.id})" style="cursor: pointer;">
-                <div class="transaction-info">
-                    <div class="transaction-description">${this.escapeHtml(tx.description)}</div>
-                    <div class="transaction-meta">
-                        ${tx.account_name} • ${this.formatDate(tx.date)}
-                    </div>
-                </div>
-                <div class="transaction-amount ${tx.type}">
-                    ${tx.type === 'income' ? '+' : '-'}${this.formatCurrency(tx.amount)}
-                </div>
-                <div class="transaction-actions">
-                    <button class="btn-icon" onclick="event.stopPropagation(); PrivateModule.deleteTransaction(${tx.id})" title="Löschen">
-                        🗑️
-                    </button>
-                </div>
-            </div>
-        `).join('');
+        const start = (pagination.page - 1) * pagination.per_page + 1;
+        const end = Math.min(pagination.page * pagination.per_page, pagination.total);
+        document.getElementById('private-transaction-pagination-info').textContent = `Zeige ${start}-${end} von ${pagination.total}`;
 
-        container.innerHTML = html;
+        const prevBtn = document.getElementById('private-transaction-prev-btn');
+        const nextBtn = document.getElementById('private-transaction-next-btn');
+        prevBtn.disabled = pagination.page <= 1;
+        nextBtn.disabled = pagination.page >= pagination.total_pages;
+
+        const pagesContainer = document.getElementById('private-transaction-pages');
+        pagesContainer.innerHTML = '';
+        for (let i = 1; i <= pagination.total_pages; i++) {
+            if (i === 1 || i === pagination.total_pages || (i >= pagination.page - 2 && i <= pagination.page + 2)) {
+                const btn = document.createElement('button');
+                btn.className = 'page-btn' + (i === pagination.page ? ' active' : '');
+                btn.textContent = i;
+                btn.onclick = () => this.goToTransactionPage(i);
+                pagesContainer.appendChild(btn);
+            } else if (i === pagination.page - 3 || i === pagination.page + 3) {
+                const dots = document.createElement('span');
+                dots.textContent = '...';
+                dots.className = 'page-dots';
+                pagesContainer.appendChild(dots);
+            }
+        }
     },
 
-    async loadAccounts() {
-        const select = document.getElementById('private-tx-account');
-        let accounts = await API.get('/api/private.php?action=accounts');
+    goToTransactionPage(page) {
+        this.transactionState.currentPage = page;
+        this.loadTransactions();
+    },
 
-        // Defensive normalization: handle cases where API returns an object/map instead of an array
-        if (!Array.isArray(accounts)) {
-            console.debug('PrivateModule.loadAccounts: normalizing accounts response', accounts);
-            accounts = Array.isArray(accounts?.data) ? accounts.data : (accounts ? Object.values(accounts) : []);
+    nextTransactionPage() {
+        if (this.transactionState.currentPage < this.transactionState.totalPages) {
+            this.transactionState.currentPage++;
+            this.loadTransactions();
         }
+    },
 
-        if (accounts) {
-            select.innerHTML = accounts.map(acc =>
-                `<option value="${acc.id}">${this.escapeHtml(acc.name)}</option>`
-            ).join('');
+    prevTransactionPage() {
+        if (this.transactionState.currentPage > 1) {
+            this.transactionState.currentPage--;
+            this.loadTransactions();
         }
+    },
+
+    changeTransactionPerPage(perPage) {
+        this.transactionState.perPage = parseInt(perPage);
+        this.transactionState.currentPage = 1;
+        this.loadTransactions();
     },
 
     showAddTransaction() {
@@ -1139,47 +1280,143 @@ const PrivateModule = {
         const container = document.getElementById('private-accounts-management');
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
-        let accounts = await API.get('/api/private/accounts');
-        console.debug('PrivateModule.loadAccountsManagement -> received', accounts);
+        const params = {
+            page: this.accountState.currentPage,
+            per_page: this.accountState.perPage
+        };
 
-        // Defensive normalization: accept { data: [...] } or object maps
-        if (!Array.isArray(accounts)) {
-            console.debug('PrivateModule.loadAccountsManagement: normalizing accounts response', accounts);
-            accounts = Array.isArray(accounts?.data) ? accounts.data : (accounts ? Object.values(accounts) : []);
-        }
+        try {
+            // Try paginated endpoint first, fall back to REST endpoint
+            let result = null;
+            try {
+                result = await API.get('/api/private.php?action=accounts&' + new URLSearchParams(params));
+            } catch (e) {
+                console.debug('Paginated accounts endpoint not available, trying /api/private/accounts', e);
+                result = await API.get('/api/private/accounts');
+            }
 
-        if (!accounts || accounts.length === 0) {
+            // Normalize
+            let accounts = [];
+            let pagination = null;
+            if (Array.isArray(result)) {
+                accounts = result;
+            } else if (result && Array.isArray(result.accounts)) {
+                accounts = result.accounts;
+                pagination = result.pagination || null;
+            } else if (Array.isArray(result?.data)) {
+                accounts = result.data;
+                pagination = result.pagination || null;
+            } else if (result && typeof result === 'object') {
+                // object map
+                accounts = Object.values(result);
+            }
+
+            if (!accounts || accounts.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Noch keine Konten vorhanden</p>
+                        <button class="btn btn-primary" onclick="PrivateModule.showAddAccount()">
+                            Erstes Konto erstellen
+                        </button>
+                    </div>
+                `;
+                const _accPagEl = document.getElementById('private-account-pagination'); if (_accPagEl) _accPagEl.style.display = 'none';
+                return;
+            }
+
+            const html = accounts.map(acc => `
+                <div class="account-manage-item">
+                    <div class="account-manage-info">
+                        <div class="account-manage-name">${this.escapeHtml(acc.name)}</div>
+                        <div class="account-manage-meta">
+                            ${acc.transaction_count || 0} Transaktionen • Saldo: ${this.formatCurrency(acc.balance || 0)}
+                        </div>
+                    </div>
+                    <div class="account-manage-actions">
+                        <button class="btn btn-small btn-secondary" data-account-id="${acc.id}" onclick="PrivateModule.editAccountById(this.dataset.accountId)">
+                            ✏️ Bearbeiten
+                        </button>
+                        <button class="btn btn-small btn-danger" onclick="PrivateModule.deleteAccount(${acc.id})">
+                            🗑️ Löschen
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+
+            // Update pagination
+            this.updateAccountPagination(pagination || { total: accounts.length, page: 1, per_page: accounts.length, total_pages: 1 });
+        } catch (error) {
+            console.error('PrivateModule.loadAccountsManagement -> error', error);
             container.innerHTML = `
-                <div class="empty-state">
-                    <p>Noch keine Konten vorhanden</p>
-                    <button class="btn btn-primary" onclick="PrivateModule.showAddAccount()">
-                        Erstes Konto erstellen
-                    </button>
+                <div class="error-state">
+                    <p>Fehler beim Laden der Konten</p>
+                    <button class="btn btn-small" onclick="PrivateModule.loadAccountsManagement()">Erneut versuchen</button>
                 </div>
             `;
+        }
+    },
+
+    updateAccountPagination(pagination) {
+        if (!pagination || pagination.total === 0) {
+            const _accPagEl2 = document.getElementById('private-account-pagination'); if (_accPagEl2) _accPagEl2.style.display = 'none';
             return;
         }
 
-        const html = accounts.map(acc => `
-            <div class="account-manage-item">
-                <div class="account-manage-info">
-                    <div class="account-manage-name">${this.escapeHtml(acc.name)}</div>
-                    <div class="account-manage-meta">
-                        ${acc.transaction_count || 0} Transaktionen • Saldo: ${this.formatCurrency(acc.balance || 0)}
-                    </div>
-                </div>
-                <div class="account-manage-actions">
-                    <button class="btn btn-small btn-secondary" data-account-id="${acc.id}" onclick="PrivateModule.editAccountById(this.dataset.accountId)">
-                        ✏️ Bearbeiten
-                    </button>
-                    <button class="btn btn-small btn-danger" onclick="PrivateModule.deleteAccount(${acc.id})">
-                        🗑️ Löschen
-                    </button>
-                </div>
-            </div>
-        `).join('');
+        document.getElementById('private-account-pagination').style.display = 'flex';
+        this.accountState.totalPages = pagination.total_pages;
 
-        container.innerHTML = html;
+        const start = (pagination.page - 1) * pagination.per_page + 1;
+        const end = Math.min(pagination.page * pagination.per_page, pagination.total);
+        document.getElementById('private-account-pagination-info').textContent = `Zeige ${start}-${end} von ${pagination.total}`;
+
+        const prevBtn = document.getElementById('private-account-prev-btn');
+        const nextBtn = document.getElementById('private-account-next-btn');
+        prevBtn.disabled = pagination.page <= 1;
+        nextBtn.disabled = pagination.page >= pagination.total_pages;
+
+        const pagesContainer = document.getElementById('private-account-pages');
+        pagesContainer.innerHTML = '';
+        for (let i = 1; i <= pagination.total_pages; i++) {
+            if (i === 1 || i === pagination.total_pages || (i >= pagination.page - 2 && i <= pagination.page + 2)) {
+                const btn = document.createElement('button');
+                btn.className = 'page-btn' + (i === pagination.page ? ' active' : '');
+                btn.textContent = i;
+                btn.onclick = () => this.goToAccountPage(i);
+                pagesContainer.appendChild(btn);
+            } else if (i === pagination.page - 3 || i === pagination.page + 3) {
+                const dots = document.createElement('span');
+                dots.textContent = '...';
+                dots.className = 'page-dots';
+                pagesContainer.appendChild(dots);
+            }
+        }
+    },
+
+    goToAccountPage(page) {
+        this.accountState.currentPage = page;
+        this.loadAccountsManagement();
+    },
+
+    nextAccountPage() {
+        if (this.accountState.currentPage < this.accountState.totalPages) {
+            this.accountState.currentPage++;
+            this.loadAccountsManagement();
+        }
+    },
+
+    prevAccountPage() {
+        if (this.accountState.currentPage > 1) {
+            this.accountState.currentPage--;
+            this.loadAccountsManagement();
+        }
+    },
+
+    changeAccountPerPage(perPage) {
+        this.accountState.perPage = parseInt(perPage);
+        this.accountState.currentPage = 1;
+        this.loadAccountsManagement();
     },
 
     showAddAccount() {
@@ -1628,14 +1865,14 @@ const PrivateModule = {
          }
     },
 
-    async unlinkInvoice(invoiceId) {
+    async unlinkInvoice(id) {
         if (!confirm('Möchtest du die Verknüpfung wirklich aufheben?')) {
             return;
         }
 
         try {
             const fd = new FormData();
-            fd.append('invoice_id', invoiceId);
+            fd.append('invoice_id', id);
             await API.postForm('/api/private.php?action=unlinkInvoiceFromTransaction', fd);
 
             App.showToast('✂️ Verknüpfung aufgehoben', 'success');
@@ -1648,9 +1885,9 @@ const PrivateModule = {
             const viewerModal = document.getElementById('private-invoice-viewer-modal');
             if (viewerModal && viewerModal.style.display === 'flex') {
                 // Re-open the viewer with updated data
-                const inv = this.lastInvoices[invoiceId];
+                const inv = this.lastInvoices[id];
                 if (inv) {
-                    this.openInvoiceViewer(invoiceId);
+                    this.openInvoiceViewer(id);
                 }
             }
         } catch (error) {
@@ -1900,6 +2137,38 @@ const PrivateModule = {
         } catch (error) {
             console.error('Fehler beim Speichern der Rechnung:', error);
             App.showToast('Fehler beim Speichern: ' + (error.message || 'Unbekannter Fehler'), 'error');
+        }
+    },
+
+    async loadAccounts() {
+        // Populate account select used in transaction form
+        const select = document.getElementById('private-tx-account');
+        if (!select) return;
+
+        try {
+            // Try action-based endpoint first, fallback to REST-like path
+            let accounts = null;
+            try {
+                accounts = await API.get('/api/private.php?action=accounts');
+            } catch (e) {
+                console.debug('Fallback to /api/private/accounts for loadAccounts', e);
+                accounts = await API.get('/api/private/accounts');
+            }
+
+            // Normalize response formats: accept { data: [...] }, array, or object map
+            if (!Array.isArray(accounts)) {
+                accounts = Array.isArray(accounts?.data) ? accounts.data : (accounts ? Object.values(accounts) : []);
+            }
+
+            if (!accounts || accounts.length === 0) {
+                select.innerHTML = '<option value="">-- Kein Konto --</option>';
+                return;
+            }
+
+            select.innerHTML = accounts.map(acc => `<option value="${acc.id}">${this.escapeHtml(acc.name)}</option>`).join('');
+        } catch (error) {
+            console.error('Failed to load accounts for select:', error);
+            select.innerHTML = '<option value="">-- Fehler beim Laden --</option>';
         }
     }
 };
