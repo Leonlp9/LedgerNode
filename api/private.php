@@ -195,10 +195,21 @@ try {
     }
 
 } catch (Throwable $e) {
+    // Log the full error for debugging
+    error_log('Private API Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+    
+    // Return sanitized error message to user
     http_response_code(500);
+    $userMessage = 'Ein Fehler ist aufgetreten';
+    
+    // Only show specific errors in development mode
+    if (defined('DEBUG') && DEBUG) {
+        $userMessage = $e->getMessage();
+    }
+    
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage()
+        'error' => $userMessage
     ]);
 }
 

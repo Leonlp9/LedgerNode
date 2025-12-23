@@ -162,26 +162,9 @@ class FileUpload
         }
 
         // Security: only delete files within upload directory
-        $realPath = realpath($filepath);
-        $uploadDir = realpath($this->config['upload_dir']);
-        
-        if ($realPath === false || $uploadDir === false) {
+        if (!$this->isPathSafe($filepath)) {
             $this->addError('Ungültiger Dateipfad');
             return false;
-        }
-        
-        // Use str_starts_with for PHP 8+ or manual check for compatibility
-        if (function_exists('str_starts_with')) {
-            if (!str_starts_with($realPath, $uploadDir . DIRECTORY_SEPARATOR)) {
-                $this->addError('Ungültiger Dateipfad');
-                return false;
-            }
-        } else {
-            // Fallback for PHP < 8.0
-            if (substr($realPath, 0, strlen($uploadDir . DIRECTORY_SEPARATOR)) !== $uploadDir . DIRECTORY_SEPARATOR) {
-                $this->addError('Ungültiger Dateipfad');
-                return false;
-            }
         }
 
         if (!unlink($filepath)) {
@@ -224,24 +207,13 @@ class FileUpload
      */
     public function getFileUrl(string $filepath): string
     {
-        $uploadDir = realpath($this->config['upload_dir']);
-        $filePath = realpath($filepath);
-        
-        if ($filePath === false || $uploadDir === false) {
+        // Security check: ensure file is within upload directory
+        if (!$this->isPathSafe($filepath)) {
             return '';
         }
         
-        // Security check: ensure file is within upload directory
-        if (function_exists('str_starts_with')) {
-            if (!str_starts_with($filePath, $uploadDir . DIRECTORY_SEPARATOR)) {
-                return '';
-            }
-        } else {
-            // Fallback for PHP < 8.0
-            if (substr($filePath, 0, strlen($uploadDir . DIRECTORY_SEPARATOR)) !== $uploadDir . DIRECTORY_SEPARATOR) {
-                return '';
-            }
-        }
+        $uploadDir = realpath($this->config['upload_dir']);
+        $filePath = realpath($filepath);
         
         $relativePath = substr($filePath, strlen($uploadDir) + 1);
         return '/uploads/' . str_replace('\\', '/', $relativePath);
@@ -334,7 +306,7 @@ class FileUpload
         // Check actual MIME type from file content
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         if ($finfo === false) {
-            $this->addError('Fileinfo-Erweiterung nicht verfügbar');
+            $this->addError('Fileinfo PHP extension is required for secure file validation. Please install php-fileinfo.');
             return false;
         }
         
@@ -347,6 +319,30 @@ class FileUpload
         }
         
         return true;
+    }
+
+    /**
+     * Validate that path is within upload directory (security check)
+     * 
+     * @param string $filepath Path to validate
+     * @return bool True if path is safe, false otherwise
+     */
+    private function isPathSafe(string $filepath): bool
+    {
+        $realPath = realpath($filepath);
+        $uploadDir = realpath($this->config['upload_dir']);
+        
+        if ($realPath === false || $uploadDir === false) {
+            return false;
+        }
+        
+        // Check if path starts with upload directory
+        if (function_exists('str_starts_with')) {
+            return str_starts_with($realPath, $uploadDir . DIRECTORY_SEPARATOR);
+        } else {
+            // Fallback for PHP < 8.0
+            return substr($realPath, 0, strlen($uploadDir . DIRECTORY_SEPARATOR)) === $uploadDir . DIRECTORY_SEPARATOR;
+        }
     }
 
     /**
