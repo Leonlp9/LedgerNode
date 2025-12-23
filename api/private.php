@@ -127,6 +127,75 @@ try {
             sendSuccess($result);
             break;
 
+        case 'createInvoiceWithPDF':
+            if ($method !== 'POST') {
+                throw new RuntimeException('Nur POST erlaubt');
+            }
+            
+            // Use the PDF generator
+            require_once __DIR__ . '/../src/Services/InvoicePDFGenerator.php';
+            $pdfGenerator = new \App\Services\InvoicePDFGenerator();
+            
+            // Generate PDF
+            $pdfPath = $pdfGenerator->generate($_POST);
+            
+            // Save invoice to database
+            $handler = new PrivateInvoices();
+            $invoiceData = $_POST;
+            
+            // Convert relative path to web-accessible path
+            $basePath = dirname(__DIR__);
+            $relativePath = str_replace($basePath, '', $pdfPath);
+            
+            // Create file array for PrivateInvoices handler
+            $fakeFile = null;
+            if (file_exists($pdfPath)) {
+                $invoiceData['file_path'] = $relativePath;
+                $invoiceData['file_name'] = basename($pdfPath);
+            }
+            
+            $result = $handler->createInvoice($invoiceData, $fakeFile);
+            
+            // Return success with PDF URL
+            sendSuccess([
+                'id' => $result['id'],
+                'message' => $result['message'],
+                'pdf_url' => $relativePath,
+                'pdf_path' => $pdfPath
+            ]);
+            break;
+
+        case 'generateBackup':
+            if ($method !== 'POST') {
+                throw new RuntimeException('Nur POST erlaubt');
+            }
+            
+            require_once __DIR__ . '/../src/Services/BackupExporter.php';
+            $exporter = new \App\Services\BackupExporter();
+            
+            $period = $_POST['period'] ?? 'all';
+            $params = [];
+            
+            if ($period === 'month') {
+                $params['year'] = $_POST['year'] ?? date('Y');
+                $params['month'] = $_POST['month'] ?? date('m');
+            } elseif ($period === 'year') {
+                $params['year'] = $_POST['year'] ?? date('Y');
+            }
+            
+            $zipPath = $exporter->generatePrivateBackup($period, $params);
+            
+            // Convert to relative URL
+            $basePath = dirname(__DIR__);
+            $relativeUrl = str_replace($basePath, '', $zipPath);
+            
+            sendSuccess([
+                'download_url' => $relativeUrl,
+                'filename' => basename($zipPath),
+                'message' => 'Backup erfolgreich erstellt'
+            ]);
+            break;
+
         // Private stats endpoint
         case 'stats':
             $db = Database::getInstance();

@@ -119,6 +119,7 @@ $assetVersion = time();
     </script>
     <script src="<?= htmlspecialchars($basePath . '/public/js/api.js') ?>?v=<?= $assetVersion ?>"></script>
     <script src="<?= htmlspecialchars($basePath . '/public/js/custom-dialog.js') ?>?v=<?= $assetVersion ?>"></script>
+    <script src="<?= htmlspecialchars($basePath . '/public/js/invoice-creator.js') ?>?v=<?= $assetVersion ?>"></script>
     <script src="<?= htmlspecialchars($basePath . '/public/js/app.js') ?>?v=<?= $assetVersion ?>"></script>
 
     <?php if (isset($additionalScripts)): ?>

@@ -12,6 +12,31 @@ Ein produktionsreifes, erweiterbares PHP-System für verteilte Buchhaltung auf R
 - ✅ **Zero Framework**: Reines PHP, JS, CSS
 - ✅ **SQLite für Pis**: Leichtgewichtig, wartungsfrei
 - ✅ **MySQL für Server**: Skalierbar, robust
+- ✅ **Invoice Creator**: Professionelle Rechnungserstellung mit PDF-Generator
+- ✅ **YouTube Tracking**: Monatliche Einnahmen- und Ausgabenverwaltung
+- ✅ **Backup & Export**: ZIP-Archivierung mit Excel-Export
+
+## 🚀 Neue Features
+
+### 📝 Rechnungserstellung
+- **Intuitiver Konfigurator** für Rechnungen und Gutschriften
+- **Automatische PDF-Generierung** mit professionellem Layout
+- **Line-Items Support** mit MwSt-Berechnung
+- **Fälligkeitsverwaltung** und Status-Tracking
+- Verfügbar für **Private und Gemeinsame** Module
+
+### 📺 YouTube Income Tracking (Shared)
+- **Monatliche Einnahmen** (Gesamt, Spenden, Mitglieder)
+- **Ausgabenverwaltung** (Betrag, Empfänger, Beschreibung)
+- Automatische **Dashboard-Integration**
+- Vollständige CRUD-Operationen
+
+### 💾 Backup & Export
+- **ZIP-Archivierung** aller Rechnungs-PDFs
+- **Excel-Export** mit detaillierten Rechnungsinformationen
+- **Flexible Filter**: Monat, Jahr oder Alle
+- **Loading-Animation** während der Generierung
+- Verfügbar für Private und Shared Module
 
 ## 📁 Projektstruktur
 
@@ -62,9 +87,10 @@ distributed-accounting/
 ### 1. Server-Instanz
 
 #### Voraussetzungen
-- PHP 8.0+
+- PHP 8.0+ (PHP 7.4+ minimum)
 - MySQL/MariaDB
 - Apache/Nginx mit mod_rewrite
+- Composer (für Abhängigkeiten)
 
 #### Schritte
 
@@ -73,10 +99,13 @@ distributed-accounting/
 git clone https://github.com/your-repo/distributed-accounting.git
 cd distributed-accounting
 
-# 2. Konfiguration erstellen
+# 2. Composer-Abhängigkeiten installieren
+composer install --no-dev
+
+# 3. Konfiguration erstellen
 cp config.example.php config.php
 
-# 3. config.php anpassen
+# 4. config.php anpassen
 nano config.php
 ```
 
@@ -108,7 +137,11 @@ EXIT;
 # 5. Schema importieren
 mysql -u accounting_user -p accounting_db < database/server_schema.sql
 
-# 6. Apache VirtualHost einrichten
+# 6. Migrations ausführen (für neue Features)
+mysql -u accounting_user -p accounting_db < database/migrations/001_add_invoices.sql
+mysql -u accounting_user -p accounting_db < database/migrations/002_add_youtube_tracking.sql
+
+# 7. Apache VirtualHost einrichten
 sudo nano /etc/apache2/sites-available/accounting.conf
 ```
 

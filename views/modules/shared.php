@@ -180,6 +180,16 @@
         </button>
     </div>
 
+    <!-- Aktionen -->
+    <div class="actions-bar">
+        <button class="btn btn-success" onclick="InvoiceCreator.open('shared', 'invoice')">
+            📝 Rechnung erstellen
+        </button>
+        <button class="btn btn-info" onclick="InvoiceCreator.open('shared', 'credit')">
+            📝 Gutschrift erstellen
+        </button>
+    </div>
+
     <!-- Placeholder content -->
     <div class="card">
         <div class="card-header">
@@ -191,6 +201,266 @@
                 <small>Funktion wird ähnlich wie Private Rechnungen implementiert, aber nutzt die Server-API.</small>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Tab: YouTube -->
+<div class="tab-content" id="shared-tab-youtube" style="display: none;">
+    <div class="module-header">
+        <h2>YouTube Einnahmen & Ausgaben</h2>
+        <p class="subtitle">Verwalte deine YouTube Kanal-Finanzen</p>
+    </div>
+
+    <!-- Sub-Tabs for YouTube -->
+    <div class="invoice-subtabs">
+        <button class="subtab-btn active" data-subtab="income" onclick="SharedModule.switchYouTubeSubtab('income')">
+            💰 Einnahmen
+        </button>
+        <button class="subtab-btn" data-subtab="expenses" onclick="SharedModule.switchYouTubeSubtab('expenses')">
+            💸 Ausgaben
+        </button>
+    </div>
+
+    <!-- YouTube Income Sub-Tab -->
+    <div id="youtube-income-section">
+        <div class="actions-bar">
+            <button class="btn btn-primary" onclick="SharedModule.showAddYouTubeIncome()">
+                ➕ Monatliche Einnahmen hinzufügen
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Monatliche YouTube Einnahmen</h3>
+                <button class="btn btn-small" onclick="SharedModule.loadYouTubeIncome()">
+                    🔄 Aktualisieren
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="youtube-income-list">
+                    <div class="empty-state">
+                        <p>Noch keine YouTube Einnahmen erfasst</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- YouTube Expenses Sub-Tab -->
+    <div id="youtube-expenses-section" style="display: none;">
+        <div class="actions-bar">
+            <button class="btn btn-primary" onclick="SharedModule.showAddYouTubeExpense()">
+                ➕ Neue Ausgabe
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>YouTube Ausgaben</h3>
+                <button class="btn btn-small" onclick="SharedModule.loadYouTubeExpenses()">
+                    🔄 Aktualisieren
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="youtube-expenses-list">
+                    <div class="empty-state">
+                        <p>Noch keine YouTube Ausgaben erfasst</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab: Backup -->
+<div class="tab-content" id="shared-tab-backup" style="display: none;">
+    <div class="module-header">
+        <h2>Backup & Export</h2>
+        <p class="subtitle">Erstelle Backups deiner gemeinsamen Rechnungen mit allen Dateien und Details</p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Backup erstellen</h3>
+        </div>
+        <div class="card-body">
+            <form id="shared-backup-form" onsubmit="SharedModule.generateBackup(event)">
+                <div class="form-group">
+                    <label for="shared-backup-period">Zeitraum</label>
+                    <select id="shared-backup-period" name="period" onchange="SharedModule.updateBackupOptions()">
+                        <option value="month">Einzelner Monat</option>
+                        <option value="year">Ganzes Jahr</option>
+                        <option value="all">Alle Rechnungen</option>
+                    </select>
+                </div>
+
+                <div id="shared-backup-month-options">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="shared-backup-year">Jahr</label>
+                            <input type="number" id="shared-backup-year" name="year" min="2000" max="2100" value="">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="shared-backup-month">Monat</label>
+                            <select id="shared-backup-month" name="month">
+                                <option value="1">Januar</option>
+                                <option value="2">Februar</option>
+                                <option value="3">März</option>
+                                <option value="4">April</option>
+                                <option value="5">Mai</option>
+                                <option value="6">Juni</option>
+                                <option value="7">Juli</option>
+                                <option value="8">August</option>
+                                <option value="9">September</option>
+                                <option value="10">Oktober</option>
+                                <option value="11">November</option>
+                                <option value="12">Dezember</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="shared-backup-year-options" style="display: none;">
+                    <div class="form-group">
+                        <label for="shared-backup-year-only">Jahr</label>
+                        <input type="number" id="shared-backup-year-only" name="year_only" min="2000" max="2100" value="">
+                    </div>
+                </div>
+
+                <div class="backup-info">
+                    <p><strong>Was wird exportiert:</strong></p>
+                    <ul>
+                        <li>Alle Rechnungs-PDF-Dateien im gewählten Zeitraum</li>
+                        <li>Excel-Tabelle mit allen Rechnungsdetails</li>
+                        <li>Gepackt als ZIP-Datei zum einfachen Download</li>
+                    </ul>
+                </div>
+
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary btn-large">
+                        💾 Backup generieren
+                    </button>
+                </div>
+            </form>
+
+            <div id="shared-backup-loading" style="display: none; text-align: center; padding: 40px;">
+                <div class="spinner" style="margin: 0 auto 20px;"></div>
+                <p><strong>Backup wird erstellt...</strong></p>
+                <p>Dies kann einige Sekunden dauern.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add YouTube Income -->
+<div id="youtube-income-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Monatliche YouTube Einnahmen</h3>
+            <button class="modal-close" onclick="SharedModule.closeYouTubeIncomeModal()">&times;</button>
+        </div>
+        <form id="youtube-income-form" onsubmit="SharedModule.submitYouTubeIncome(event)">
+            <input type="hidden" id="yt-income-id" name="id">
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="yt-income-year">Jahr</label>
+                    <input type="number" id="yt-income-year" name="year" min="2000" max="2100" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="yt-income-month">Monat</label>
+                    <select id="yt-income-month" name="month" required>
+                        <option value="1">Januar</option>
+                        <option value="2">Februar</option>
+                        <option value="3">März</option>
+                        <option value="4">April</option>
+                        <option value="5">Mai</option>
+                        <option value="6">Juni</option>
+                        <option value="7">Juli</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">Oktober</option>
+                        <option value="11">November</option>
+                        <option value="12">Dezember</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="yt-income-total">Gesamteinnahmen (€)</label>
+                <input type="number" id="yt-income-total" name="total_revenue" step="0.01" min="0" required>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="yt-income-donations">Spenden (€)</label>
+                    <input type="number" id="yt-income-donations" name="donations" step="0.01" min="0" value="0">
+                </div>
+                
+                <div class="form-group">
+                    <label for="yt-income-members">Mitglieder (€)</label>
+                    <input type="number" id="yt-income-members" name="members" step="0.01" min="0" value="0">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="yt-income-notes">Notizen (optional)</label>
+                <textarea id="yt-income-notes" name="notes" rows="2" placeholder="Zusätzliche Informationen"></textarea>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="SharedModule.closeYouTubeIncomeModal()">
+                    Abbrechen
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    Speichern
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Add YouTube Expense -->
+<div id="youtube-expense-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>YouTube Ausgabe</h3>
+            <button class="modal-close" onclick="SharedModule.closeYouTubeExpenseModal()">&times;</button>
+        </div>
+        <form id="youtube-expense-form" onsubmit="SharedModule.submitYouTubeExpense(event)">
+            <input type="hidden" id="yt-expense-id" name="id">
+            
+            <div class="form-group">
+                <label for="yt-expense-amount">Betrag (€)</label>
+                <input type="number" id="yt-expense-amount" name="amount" step="0.01" min="0.01" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="yt-expense-recipient">An wen / Empfänger</label>
+                <input type="text" id="yt-expense-recipient" name="recipient" required placeholder="z.B. Designer, Editor">
+            </div>
+            
+            <div class="form-group">
+                <label for="yt-expense-description">Wofür / Beschreibung</label>
+                <textarea id="yt-expense-description" name="description" rows="3" required placeholder="Was wurde bezahlt"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="yt-expense-date">Datum</label>
+                <input type="date" id="yt-expense-date" name="date" required>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="SharedModule.closeYouTubeExpenseModal()">
+                    Abbrechen
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    Speichern
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -299,7 +569,9 @@ const SharedModule = {
                 { id: 'dashboard', label: 'Dashboard', icon: '📊' },
                 { id: 'transactions', label: 'Transaktionen', icon: '💳' },
                 { id: 'accounts', label: 'Konten', icon: '📁' },
-                { id: 'invoices', label: 'Rechnungen', icon: '📄' }
+                { id: 'invoices', label: 'Rechnungen', icon: '📄' },
+                { id: 'youtube', label: 'YouTube', icon: '📺' },
+                { id: 'backup', label: 'Backup', icon: '💾' }
             ]);
         }
 
@@ -316,6 +588,9 @@ const SharedModule = {
         
         // Setze heutiges Datum als Standard
         document.getElementById('shared-tx-date').valueAsDate = new Date();
+        
+        // Initialize backup options
+        this.updateBackupOptions();
     },
 
     async checkServerConnection() {
@@ -764,6 +1039,345 @@ const SharedModule = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    // ========== YouTube Functions ==========
+
+    youtubeState: {
+        currentSubtab: 'income'
+    },
+
+    switchYouTubeSubtab(subtab) {
+        this.youtubeState.currentSubtab = subtab;
+        
+        if (subtab === 'income') {
+            document.getElementById('youtube-income-section').style.display = 'block';
+            document.getElementById('youtube-expenses-section').style.display = 'none';
+        } else {
+            document.getElementById('youtube-income-section').style.display = 'none';
+            document.getElementById('youtube-expenses-section').style.display = 'block';
+        }
+        
+        // Update active button
+        document.querySelectorAll('.invoice-subtabs .subtab-btn').forEach(btn => {
+            if (btn.dataset.subtab === subtab) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        
+        // Load respective data
+        if (subtab === 'income') {
+            this.loadYouTubeIncome();
+        } else {
+            this.loadYouTubeExpenses();
+        }
+    },
+
+    async loadYouTubeIncome() {
+        const container = document.getElementById('youtube-income-list');
+        container.innerHTML = '<div class="loading">Lädt...</div>';
+
+        try {
+            const incomeData = await API.postShared('getYouTubeIncome', {});
+            
+            if (!incomeData || incomeData.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Noch keine YouTube Einnahmen erfasst</p>
+                        <button class="btn btn-primary" onclick="SharedModule.showAddYouTubeIncome()">
+                            Erste Einnahme hinzufügen
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = incomeData.map(item => {
+                const monthName = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'][item.month - 1];
+                return `
+                    <div class="youtube-income-item">
+                        <div class="youtube-income-header">
+                            <strong>${monthName} ${item.year}</strong>
+                            <div class="youtube-actions">
+                                <button class="btn btn-small btn-secondary" onclick="SharedModule.editYouTubeIncome(${item.id})">
+                                    ✏️ Bearbeiten
+                                </button>
+                                <button class="btn btn-small btn-danger" onclick="SharedModule.deleteYouTubeIncome(${item.id})">
+                                    🗑️ Löschen
+                                </button>
+                            </div>
+                        </div>
+                        <div class="youtube-income-details">
+                            <div class="detail-item">
+                                <span class="label">Gesamteinnahmen:</span>
+                                <span class="value">${this.formatCurrency(item.total_revenue)}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Spenden:</span>
+                                <span class="value">${this.formatCurrency(item.donations)}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="label">Mitglieder:</span>
+                                <span class="value">${this.formatCurrency(item.members)}</span>
+                            </div>
+                            ${item.notes ? `<div class="detail-item"><span class="label">Notizen:</span><span class="value">${this.escapeHtml(item.notes)}</span></div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading YouTube income:', error);
+            container.innerHTML = `
+                <div class="error-state">
+                    <p>Fehler beim Laden</p>
+                    <button class="btn btn-small" onclick="SharedModule.loadYouTubeIncome()">
+                        Erneut versuchen
+                    </button>
+                </div>
+            `;
+        }
+    },
+
+    async loadYouTubeExpenses() {
+        const container = document.getElementById('youtube-expenses-list');
+        container.innerHTML = '<div class="loading">Lädt...</div>';
+
+        try {
+            const expenses = await API.postShared('getYouTubeExpenses', {});
+            
+            if (!expenses || expenses.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>Noch keine YouTube Ausgaben erfasst</p>
+                        <button class="btn btn-primary" onclick="SharedModule.showAddYouTubeExpense()">
+                            Erste Ausgabe hinzufügen
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = expenses.map(expense => `
+                <div class="transaction-item expense">
+                    <div class="transaction-info">
+                        <div class="transaction-description">${this.escapeHtml(expense.description)}</div>
+                        <div class="transaction-meta">
+                            ${this.escapeHtml(expense.recipient)} • ${this.formatDate(expense.date)}
+                        </div>
+                    </div>
+                    <div class="transaction-amount expense">
+                        -${this.formatCurrency(expense.amount)}
+                    </div>
+                    <div class="transaction-actions">
+                        <button class="btn-icon" onclick="SharedModule.deleteYouTubeExpense(${expense.id})" title="Löschen">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Error loading YouTube expenses:', error);
+            container.innerHTML = `
+                <div class="error-state">
+                    <p>Fehler beim Laden</p>
+                    <button class="btn btn-small" onclick="SharedModule.loadYouTubeExpenses()">
+                        Erneut versuchen
+                    </button>
+                </div>
+            `;
+        }
+    },
+
+    showAddYouTubeIncome() {
+        const now = new Date();
+        document.getElementById('yt-income-year').value = now.getFullYear();
+        document.getElementById('yt-income-month').value = now.getMonth() + 1;
+        document.getElementById('yt-income-id').value = '';
+        document.getElementById('youtube-income-form').reset();
+        document.getElementById('youtube-income-modal').style.display = 'flex';
+    },
+
+    closeYouTubeIncomeModal() {
+        document.getElementById('youtube-income-modal').style.display = 'none';
+    },
+
+    async submitYouTubeIncome(event) {
+        event.preventDefault();
+        
+        const formData = new FormData(event.target);
+        const data = Object.fromEntries(formData);
+
+        try {
+            const action = data.id ? 'updateYouTubeIncome' : 'addYouTubeIncome';
+            await API.postShared(action, data);
+            
+            App.showToast('YouTube Einnahmen gespeichert', 'success');
+            this.closeYouTubeIncomeModal();
+            await this.loadYouTubeIncome();
+            await this.loadStats(); // Refresh dashboard stats
+        } catch (error) {
+            App.showToast('Fehler beim Speichern', 'error');
+        }
+    },
+
+    async deleteYouTubeIncome(id) {
+        if (!await App.confirm('YouTube Einnahmen wirklich löschen?')) return;
+
+        try {
+            await API.postShared('deleteYouTubeIncome', { id });
+            App.showToast('YouTube Einnahmen gelöscht', 'success');
+            await this.loadYouTubeIncome();
+            await this.loadStats();
+        } catch (error) {
+            App.showToast('Fehler beim Löschen', 'error');
+        }
+    },
+
+    async editYouTubeIncome(id) {
+        try {
+            const incomeData = await API.postShared('getYouTubeIncome', {});
+            const income = incomeData.find(item => item.id === id);
+            
+            if (!income) {
+                App.showToast('Einnahmen nicht gefunden', 'error');
+                return;
+            }
+            
+            // Populate form
+            document.getElementById('yt-income-id').value = income.id;
+            document.getElementById('yt-income-year').value = income.year;
+            document.getElementById('yt-income-month').value = income.month;
+            document.getElementById('yt-income-total').value = income.total_revenue;
+            document.getElementById('yt-income-donations').value = income.donations || 0;
+            document.getElementById('yt-income-members').value = income.members || 0;
+            document.getElementById('yt-income-notes').value = income.notes || '';
+            
+            // Show modal
+            document.getElementById('youtube-income-modal').style.display = 'flex';
+        } catch (error) {
+            App.showToast('Fehler beim Laden', 'error');
+        }
+    },
+
+    showAddYouTubeExpense() {
+        document.getElementById('yt-expense-date').valueAsDate = new Date();
+        document.getElementById('yt-expense-id').value = '';
+        document.getElementById('youtube-expense-form').reset();
+        document.getElementById('youtube-expense-modal').style.display = 'flex';
+    },
+
+    closeYouTubeExpenseModal() {
+        document.getElementById('youtube-expense-modal').style.display = 'none';
+    },
+
+    async submitYouTubeExpense(event) {
+        event.preventDefault();
+        
+        const formData = new FormData(event.target);
+        const data = Object.fromEntries(formData);
+
+        try {
+            const action = data.id ? 'updateYouTubeExpense' : 'addYouTubeExpense';
+            await API.postShared(action, data);
+            
+            App.showToast('YouTube Ausgabe gespeichert', 'success');
+            this.closeYouTubeExpenseModal();
+            await this.loadYouTubeExpenses();
+        } catch (error) {
+            App.showToast('Fehler beim Speichern', 'error');
+        }
+    },
+
+    async deleteYouTubeExpense(id) {
+        if (!await App.confirm('YouTube Ausgabe wirklich löschen?')) return;
+
+        try {
+            await API.postShared('deleteYouTubeExpense', { id });
+            App.showToast('YouTube Ausgabe gelöscht', 'success');
+            await this.loadYouTubeExpenses();
+        } catch (error) {
+            App.showToast('Fehler beim Löschen', 'error');
+        }
+    },
+
+    // ========== Backup Functions ==========
+
+    updateBackupOptions() {
+        const period = document.getElementById('shared-backup-period').value;
+        const monthOptions = document.getElementById('shared-backup-month-options');
+        const yearOptions = document.getElementById('shared-backup-year-options');
+        
+        const now = new Date();
+        
+        if (period === 'month') {
+            monthOptions.style.display = 'block';
+            yearOptions.style.display = 'none';
+            document.getElementById('shared-backup-year').value = now.getFullYear();
+            document.getElementById('shared-backup-month').value = now.getMonth() + 1;
+        } else if (period === 'year') {
+            monthOptions.style.display = 'none';
+            yearOptions.style.display = 'block';
+            document.getElementById('shared-backup-year-only').value = now.getFullYear();
+        } else {
+            monthOptions.style.display = 'none';
+            yearOptions.style.display = 'none';
+        }
+    },
+
+    async generateBackup(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        // Show loading state
+        document.getElementById('shared-backup-loading').style.display = 'block';
+        form.style.display = 'none';
+        
+        try {
+            // Prepare request data
+            const period = data.period;
+            const params = { period };
+            
+            if (period === 'month') {
+                params.year = data.year;
+                params.month = data.month;
+            } else if (period === 'year') {
+                params.year = data.year_only || data.year;
+            }
+            
+            // Call API
+            const result = await API.postShared('generateBackup', params);
+            
+            if (result && result.download_url) {
+                // Download the file
+                const link = document.createElement('a');
+                link.href = result.download_url;
+                link.download = result.filename || 'backup.zip';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                App.showToast('✅ Backup erfolgreich erstellt', 'success');
+            } else {
+                throw new Error('Backup konnte nicht erstellt werden');
+            }
+            
+        } catch (error) {
+            console.error('Error generating backup:', error);
+            App.showToast('Fehler beim Erstellen des Backups: ' + (error.message || 'Unbekannter Fehler'), 'error');
+        } finally {
+            // Hide loading state
+            document.getElementById('shared-backup-loading').style.display = 'none';
+            form.style.display = 'block';
+        }
     }
 };
 

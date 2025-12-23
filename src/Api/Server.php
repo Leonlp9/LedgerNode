@@ -170,12 +170,20 @@ class Server
      */
     private function actionGetSharedStats(): array
     {
-        // Gesamteinnahmen
+        // Gesamteinnahmen aus Transaktionen
         $income = $this->db->fetchOne("
             SELECT COALESCE(SUM(amount), 0) as total
             FROM shared_transactions
             WHERE type = 'income'
         ")['total'];
+
+        // YouTube Einnahmen hinzufügen
+        $youtubeIncome = $this->db->fetchOne("
+            SELECT COALESCE(SUM(total_revenue), 0) as total
+            FROM shared_youtube_income
+        ")['total'] ?? 0;
+        
+        $totalIncome = $income + $youtubeIncome;
 
         // Gesamtausgaben
         $expenses = $this->db->fetchOne("
@@ -198,10 +206,11 @@ class Server
         ");
 
         return [
-            'total_income' => $income,
+            'total_income' => $totalIncome,
             'total_expenses' => $expenses,
-            'balance' => $income - $expenses,
-            'monthly_stats' => $monthlyStats
+            'balance' => $totalIncome - $expenses,
+            'monthly_stats' => $monthlyStats,
+            'youtube_income' => $youtubeIncome
         ];
     }
 
@@ -609,6 +618,233 @@ class Server
         $this->db->execute('DELETE FROM shared_invoices WHERE id = :id', [':id' => $id]);
 
         return ['message' => 'Rechnung gelöscht'];
+    }
+
+    /**
+     * Action: Get YouTube Income
+     */
+    private function actionGetYouTubeIncome(): array
+    {
+        $sql = "
+            SELECT *
+            FROM shared_youtube_income
+            ORDER BY year DESC, month DESC
+        ";
+        
+        return $this->db->fetchAll($sql);
+    }
+
+    /**
+     * Action: Add YouTube Income
+     */
+    private function actionAddYouTubeIncome(): array
+    {
+        $required = ['year', 'month', 'total_revenue'];
+        foreach ($required as $field) {
+            if (!isset($_POST[$field])) {
+                throw new \InvalidArgumentException("Pflichtfeld fehlt: {$field}");
+            }
+        }
+
+        $data = [
+            'year' => (int)$_POST['year'],
+            'month' => (int)$_POST['month'],
+            'total_revenue' => (float)$_POST['total_revenue'],
+            'donations' => (float)($_POST['donations'] ?? 0),
+            'members' => (float)($_POST['members'] ?? 0),
+            'notes' => $_POST['notes'] ?? null
+        ];
+
+        // Check if entry for this month already exists
+        $existing = $this->db->fetchOne(
+            'SELECT id FROM shared_youtube_income WHERE year = :year AND month = :month',
+            [':year' => $data['year'], ':month' => $data['month']]
+        );
+
+        if ($existing) {
+            throw new \RuntimeException('Einnahmen für diesen Monat bereits vorhanden. Bitte bearbeiten Sie den bestehenden Eintrag.');
+        }
+
+        $id = $this->db->insertArray('shared_youtube_income', $data);
+
+        return [
+            'id' => $id,
+            'message' => 'YouTube Einnahmen hinzugefügt'
+        ];
+    }
+
+    /**
+     * Action: Update YouTube Income
+     */
+    private function actionUpdateYouTubeIncome(): array
+    {
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            throw new \InvalidArgumentException('Ungültige ID');
+        }
+
+        $updates = [];
+        $bindings = [':id' => $id];
+
+        $allowedFields = ['year', 'month', 'total_revenue', 'donations', 'members', 'notes'];
+        foreach ($allowedFields as $field) {
+            if (isset($_POST[$field])) {
+                $updates[] = "{$field} = :{$field}";
+                $bindings[":{$field}"] = $_POST[$field];
+            }
+        }
+
+        if (empty($updates)) {
+            throw new \InvalidArgumentException('Keine Felder zum Aktualisieren');
+        }
+
+        $sql = "UPDATE shared_youtube_income SET " . implode(', ', $updates) . " WHERE id = :id";
+        $this->db->execute($sql, $bindings);
+
+        return ['message' => 'YouTube Einnahmen aktualisiert'];
+    }
+
+    /**
+     * Action: Delete YouTube Income
+     */
+    private function actionDeleteYouTubeIncome(): array
+    {
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            throw new \InvalidArgumentException('Ungültige ID');
+        }
+
+        $this->db->execute('DELETE FROM shared_youtube_income WHERE id = :id', [':id' => $id]);
+
+        return ['message' => 'YouTube Einnahmen gelöscht'];
+    }
+
+    /**
+     * Action: Get YouTube Expenses
+     */
+    private function actionGetYouTubeExpenses(): array
+    {
+        $sql = "
+            SELECT *
+            FROM shared_youtube_expenses
+            ORDER BY date DESC, created_at DESC
+        ";
+        
+        return $this->db->fetchAll($sql);
+    }
+
+    /**
+     * Action: Add YouTube Expense
+     */
+    private function actionAddYouTubeExpense(): array
+    {
+        $required = ['amount', 'recipient', 'description', 'date'];
+        foreach ($required as $field) {
+            if (!isset($_POST[$field])) {
+                throw new \InvalidArgumentException("Pflichtfeld fehlt: {$field}");
+            }
+        }
+
+        $data = [
+            'amount' => (float)$_POST['amount'],
+            'recipient' => $_POST['recipient'],
+            'description' => $_POST['description'],
+            'date' => $_POST['date']
+        ];
+
+        $id = $this->db->insertArray('shared_youtube_expenses', $data);
+
+        return [
+            'id' => $id,
+            'message' => 'YouTube Ausgabe hinzugefügt'
+        ];
+    }
+
+    /**
+     * Action: Delete YouTube Expense
+     */
+    private function actionDeleteYouTubeExpense(): array
+    {
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            throw new \InvalidArgumentException('Ungültige ID');
+        }
+
+        $this->db->execute('DELETE FROM shared_youtube_expenses WHERE id = :id', [':id' => $id]);
+
+        return ['message' => 'YouTube Ausgabe gelöscht'];
+    }
+
+    /**
+     * Action: Generate Backup
+     */
+    private function actionGenerateBackup(): array
+    {
+        require_once __DIR__ . '/../../src/Services/BackupExporter.php';
+        $exporter = new \App\Services\BackupExporter();
+        
+        $period = $_POST['period'] ?? 'all';
+        $params = [];
+        
+        if ($period === 'month') {
+            $params['year'] = $_POST['year'] ?? date('Y');
+            $params['month'] = $_POST['month'] ?? date('m');
+        } elseif ($period === 'year') {
+            $params['year'] = $_POST['year'] ?? date('Y');
+        }
+        
+        $zipPath = $exporter->generateSharedBackup($period, $params);
+        
+        // Convert to relative URL
+        $basePath = dirname(dirname(__DIR__));
+        $relativeUrl = str_replace($basePath, '', $zipPath);
+        
+        return [
+            'download_url' => $relativeUrl,
+            'filename' => basename($zipPath),
+            'message' => 'Backup erfolgreich erstellt'
+        ];
+    }
+
+    /**
+     * Action: Create Invoice with PDF
+     */
+    private function actionCreateInvoiceWithPDF(): array
+    {
+        require_once __DIR__ . '/../../src/Services/InvoicePDFGenerator.php';
+        $pdfGenerator = new \App\Services\InvoicePDFGenerator();
+        
+        // Generate PDF
+        $pdfPath = $pdfGenerator->generate($_POST);
+        
+        // Convert relative path to web-accessible path
+        $basePath = dirname(dirname(__DIR__));
+        $relativePath = str_replace($basePath, '', $pdfPath);
+        
+        // Prepare invoice data for database
+        $data = [
+            'type' => $_POST['type'] ?? $_POST['invoice_type'],
+            'invoice_number' => $_POST['invoice_number'],
+            'invoice_date' => $_POST['invoice_date'],
+            'due_date' => $_POST['due_date'] ?? null,
+            'amount' => $_POST['amount'],
+            'sender' => $_POST['sender'],
+            'recipient' => $_POST['recipient'],
+            'description' => $_POST['description'],
+            'file_path' => $pdfPath,
+            'file_name' => basename($pdfPath),
+            'status' => $_POST['status'] ?? 'open',
+            'notes' => $_POST['notes'] ?? null
+        ];
+        
+        $id = $this->db->insertArray('shared_invoices', $data);
+        
+        return [
+            'id' => $id,
+            'message' => 'Rechnung erstellt',
+            'pdf_url' => $relativePath,
+            'pdf_path' => $pdfPath
+        ];
     }
 
     /**
