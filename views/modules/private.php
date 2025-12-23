@@ -353,19 +353,19 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="private-inv-number">Rechnungsnummer</label>
-                    <input type="text" 
-                           id="private-inv-number" 
-                           name="invoice_number" 
+                    <input type="text"
+                           id="private-inv-number"
+                           name="invoice_number"
                            placeholder="z.B. RE-2024-001">
                 </div>
 
                 <div class="form-group">
                     <label for="private-inv-amount">Betrag (€)</label>
-                    <input type="number" 
-                           id="private-inv-amount" 
-                           name="amount" 
-                           step="0.01" 
-                           min="0.01" 
+                    <input type="number"
+                           id="private-inv-amount"
+                           name="amount"
+                           step="0.01"
+                           min="0.01"
                            placeholder="0.00"
                            required>
                 </div>
@@ -374,16 +374,16 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="private-inv-date">Rechnungsdatum</label>
-                    <input type="date" 
-                           id="private-inv-date" 
-                           name="invoice_date" 
+                    <input type="date"
+                           id="private-inv-date"
+                           name="invoice_date"
                            required>
                 </div>
 
                 <div class="form-group">
                     <label for="private-inv-due-date">Fälligkeitsdatum</label>
-                    <input type="date" 
-                           id="private-inv-due-date" 
+                    <input type="date"
+                           id="private-inv-due-date"
                            name="due_date">
                 </div>
             </div>
@@ -391,18 +391,18 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="private-inv-sender">Von (Absender)</label>
-                    <input type="text" 
-                           id="private-inv-sender" 
-                           name="sender" 
+                    <input type="text"
+                           id="private-inv-sender"
+                           name="sender"
                            placeholder="Name des Absenders"
                            required>
                 </div>
 
                 <div class="form-group">
                     <label for="private-inv-recipient">An (Empfänger)</label>
-                    <input type="text" 
-                           id="private-inv-recipient" 
-                           name="recipient" 
+                    <input type="text"
+                           id="private-inv-recipient"
+                           name="recipient"
                            placeholder="Name des Empfängers"
                            required>
                 </div>
@@ -1679,14 +1679,14 @@ const PrivateModule = {
 
     async submitInvoice(event) {
         event.preventDefault();
-        
+
         const form = event.target;
         const formData = new FormData(form);
         const id = formData.get('id');
 
         try {
             const action = id ? 'updateInvoice' : 'createInvoice';
-            
+
             // Verwende API-Helper mit FormData, damit basePath beachtet wird und PHP $_POST/$_FILES gefüllt werden
             const result = await API.postForm('/api/private.php?action=' + action, formData);
 
