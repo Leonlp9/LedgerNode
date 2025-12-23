@@ -859,7 +859,7 @@ const PrivateModule = {
         if (!await App.confirm('Transaktion wirklich löschen?')) return;
 
         const result = await API.delete(`/api/private/transactions/${id}`);
-        
+
         if (result) {
             App.showToast('Transaktion gelöscht', 'success');
             await this.loadStats();
@@ -985,14 +985,14 @@ const PrivateModule = {
 
     async submitAccount(event) {
         event.preventDefault();
-        
+
         const form = event.target;
         const formData = new FormData(form);
         const data = Object.fromEntries(formData);
-        
+
         const id = data.id;
         let result;
-        
+
         if (id) {
             // Update existing account
             result = await API.put(`/api/private/accounts/${id}`, data);
@@ -1000,7 +1000,7 @@ const PrivateModule = {
             // Create new account
             result = await API.post('/api/private/accounts', data);
         }
-        
+
         if (result) {
             App.showToast(id ? 'Konto aktualisiert' : 'Konto erstellt', 'success');
             this.closeAccountModal();
@@ -1013,7 +1013,7 @@ const PrivateModule = {
         if (!await App.confirm('Konto wirklich löschen? Alle zugehörigen Transaktionen werden ebenfalls gelöscht.')) return;
 
         const result = await API.delete(`/api/private/accounts/${id}`);
-        
+
         if (result) {
             App.showToast('Konto gelöscht', 'success');
             await this.loadAccounts();
@@ -1379,3 +1379,4 @@ _startPrivateModuleWhenReady();
 </script>
 
 </div>
+

@@ -179,8 +179,40 @@ if (strpos($reqPath, '/api/') === false) {
     }
 }
 
+// Falls der Pfad direkt auf die legacy private.php zeigt, delegiere an diese Datei (erwartet action=?-API)
+if (strpos($reqPath, '/api/private.php') === 0 && !Config::isServer()) {
+    // Falls der übergebene path eigene Query-Parameter enthält (z.B. "/api/private.php?action=stats"),
+    // diese hier extrahieren und in $_GET/$_REQUEST mergen, damit api/private.php wie bei einem direkten Aufruf funktioniert.
+    $parsed = parse_url($reqPath);
+    if ($parsed !== false) {
+        // Pfad ohne Query
+        if (isset($parsed['path'])) {
+            $reqPath = $parsed['path'];
+        }
+        if (isset($parsed['query'])) {
+            parse_str($parsed['query'], $q);
+            if (is_array($q)) {
+                // Merge nur wenn Schlüssel nicht bereits vorhanden sind (hole nicht vorhandene Keys)
+                foreach ($q as $k => $v) {
+                    if (!isset($_GET[$k])) $_GET[$k] = $v;
+                    if (!isset($_REQUEST[$k])) $_REQUEST[$k] = $v;
+                }
+            }
+        }
+    }
+
+    // Enable DEBUG for local requests so private.php returns detailed errors during development
+    if (!defined('DEBUG') && isset($_SERVER['REMOTE_ADDR']) && $ipIsPrivate($_SERVER['REMOTE_ADDR'])) {
+        define('DEBUG', true);
+    }
+
+    // api/private.php prüft selbst Config::isServer und sendet die passende Response
+    require_once __DIR__ . '/private.php';
+    exit;
+}
+
 // Behandle einfache private-API Pfade als schnelle Stubs (nur wenn diese Instanz KEIN Server ist)
-if (preg_match('#^/api/private(?:/.*)?$#', $reqPath) && !Config::isServer()) {
+if (preg_match('#^/api/private(?:\.php)?(?:[\/\?].*)?$#', $reqPath) && !Config::isServer()) {
     header('Content-Type: application/json');
 
     // Hilfsfunktion: JSON-Body parsen falls vorhanden
@@ -422,12 +454,22 @@ if (preg_match('#^/api/private(?:/.*)?$#', $reqPath) && !Config::isServer()) {
     // /api/private/accounts (GET)
     if ($_SERVER['REQUEST_METHOD'] === 'GET' && preg_match('#^/api/private/accounts$#', $reqPath)) {
         try {
-            // Verwende Unterabfrage, um den Kontostand pro Konto zu berechnen und GROUP BY-Probleme zu vermeiden
+            // Verwende Unterabfragen, um den Kontostand und die Transaktionsanzahl pro Konto zu berechnen
             $sql = "SELECT a.id, a.name, a.type, a.description, a.initial_balance, a.created_at, a.updated_at, 
-                        (SELECT COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount WHEN t.type = 'expense' THEN -t.amount ELSE 0 END), 0) FROM private_transactions t WHERE t.account_id = a.id) as balance 
+                        (SELECT COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount WHEN t.type = 'expense' THEN -t.amount ELSE 0 END), 0) FROM private_transactions t WHERE t.account_id = a.id) as balance,
+                        (SELECT COUNT(*) FROM private_transactions t WHERE t.account_id = a.id) as transaction_count
                     FROM private_accounts a 
                     ORDER BY a.name ASC";
             $rows = $db->fetchAll($sql);
+
+            // Normalisiere Typen (PHP liefert DB-Zahlen oft als Strings)
+            if (is_array($rows)) {
+                foreach ($rows as $i => $r) {
+                    $rows[$i]['balance'] = isset($r['balance']) ? (float) $r['balance'] : 0.0;
+                    $rows[$i]['transaction_count'] = isset($r['transaction_count']) ? (int) $r['transaction_count'] : 0;
+                }
+            }
+
             echo json_encode(['success' => true, 'data' => $rows]);
         } catch (\Exception $e) {
             echo json_encode(['success' => true, 'data' => []]);

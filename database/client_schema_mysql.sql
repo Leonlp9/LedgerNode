@@ -52,6 +52,33 @@ CREATE TABLE IF NOT EXISTS budgets (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Private Invoices (client-side)
+CREATE TABLE IF NOT EXISTS private_invoices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    type ENUM('received', 'issued') NOT NULL,
+    invoice_number VARCHAR(100),
+    invoice_date DATE NOT NULL,
+    due_date DATE DEFAULT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    sender VARCHAR(255),
+    recipient VARCHAR(255),
+    description TEXT,
+    file_path VARCHAR(500),
+    file_name VARCHAR(255),
+    transaction_id INT DEFAULT NULL,
+    is_linked TINYINT(1) NOT NULL DEFAULT 0,
+    status ENUM('open','paid','overdue','cancelled') NOT NULL DEFAULT 'open',
+    notes TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (transaction_id) REFERENCES private_transactions(id) ON DELETE SET NULL,
+    INDEX idx_invoices_type (type),
+    INDEX idx_invoices_date (invoice_date),
+    INDEX idx_invoices_linked (is_linked),
+    INDEX idx_invoices_status (status),
+    INDEX idx_invoices_transaction (transaction_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Indizes für Performance (falls zusätzliche benötigt werden)
 CREATE INDEX IF NOT EXISTS idx_transactions_account ON private_transactions(account_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_type ON private_transactions(type);
@@ -79,4 +106,3 @@ INSERT INTO private_transactions (account_id, type, amount, description, categor
     (3, 'expense', 15.50, 'Kino-Tickets', 'Unterhaltung', DATE_SUB(CURDATE(), INTERVAL 3 DAY));
 
 -- Hinweis: In MySQL werden updated_at-Felder mit ON UPDATE CURRENT_TIMESTAMP gepflegt; eigene Trigger sind nicht nötig.
-

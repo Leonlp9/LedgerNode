@@ -130,25 +130,24 @@ try {
         // Private stats endpoint
         case 'stats':
             $db = Database::getInstance();
-            
-            $balance = $db->fetchOne("
-                SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END), 0) as balance
-                FROM private_transactions
-            ")['balance'] ?? 0;
 
-            $income = $db->fetchOne("
-                SELECT COALESCE(SUM(amount), 0) as total
-                FROM private_transactions
-                WHERE type = 'income'
-                AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')
-            ")['total'] ?? 0;
+            // Determine driver to use DB-specific SQL functions
+            $driver = \App\Core\Config::get('DB.driver', 'mysql');
 
-            $expenses = $db->fetchOne("
-                SELECT COALESCE(SUM(amount), 0) as total
-                FROM private_transactions
-                WHERE type = 'expense'
-                AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')
-            ")['total'] ?? 0;
+            if ($driver === 'sqlite') {
+                $balance = $db->fetchOne("\n                SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END), 0) as balance\n                FROM private_transactions\n            ")['balance'] ?? 0;
+
+                $income = $db->fetchOne("\n                SELECT COALESCE(SUM(amount), 0) as total\n                FROM private_transactions\n                WHERE type = 'income'\n                AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')\n            ")['total'] ?? 0;
+
+                $expenses = $db->fetchOne("\n                SELECT COALESCE(SUM(amount), 0) as total\n                FROM private_transactions\n                WHERE type = 'expense'\n                AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')\n            ")['total'] ?? 0;
+            } else {
+                // Default to MySQL-compatible SQL
+                $balance = $db->fetchOne("\n                SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END), 0) as balance\n                FROM private_transactions\n            ")['balance'] ?? 0;
+
+                $income = $db->fetchOne("\n                SELECT COALESCE(SUM(amount), 0) as total\n                FROM private_transactions\n                WHERE type = 'income'\n                AND DATE_FORMAT(date, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')\n            ")['total'] ?? 0;
+
+                $expenses = $db->fetchOne("\n                SELECT COALESCE(SUM(amount), 0) as total\n                FROM private_transactions\n                WHERE type = 'expense'\n                AND DATE_FORMAT(date, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')\n            ")['total'] ?? 0;
+            }
 
             sendSuccess([
                 'balance' => $balance,
