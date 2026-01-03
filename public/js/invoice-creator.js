@@ -359,7 +359,10 @@ const InvoiceCreator = {
             const data = Object.fromEntries(formData);
             
             // Add line items
-            data.line_items = JSON.stringify(this.lineItems);
+            // Ensure line_items and calculated fields are present in the actual FormData
+            const lineItemsJson = JSON.stringify(this.lineItems);
+            data.line_items = lineItemsJson;
+            formData.set('line_items', lineItemsJson);
 
             // Calculate totals
             let subtotal = 0;
@@ -373,15 +376,32 @@ const InvoiceCreator = {
             data.subtotal = subtotal.toFixed(2);
             data.tax_total = taxTotal.toFixed(2);
 
+            // Put totals into FormData as well so the server receives them
+            formData.set('amount', data.amount);
+            formData.set('subtotal', data.subtotal);
+            formData.set('tax_total', data.tax_total);
+
             // Create description from line items
             const descriptions = this.lineItems.map(item => item.description).filter(d => d);
             data.description = descriptions.join(', ') || 'Rechnung';
+            formData.set('description', data.description);
 
             // Set type based on invoice_type
             data.type = data.invoice_type; // 'issued' or 'received'
+            formData.set('type', data.type);
 
             // Set status
             data.status = 'open';
+            formData.set('status', data.status);
+
+            // Debug: log the final FormData payload (convertible) to help debugging
+            try {
+                if (window && window.console && window.console.debug) {
+                    console.debug('FormData being sent:', Array.from(formData.entries()));
+                }
+            } catch (e) {
+                // ignore
+            }
 
             // Create invoice via API
             const endpoint = this.currentModule === 'private' 
@@ -395,7 +415,8 @@ const InvoiceCreator = {
             if (result && result.pdf_url) {
                 // Download PDF
                 const link = document.createElement('a');
-                link.href = result.pdf_url;
+                // Prefer the full URL when server provides it
+                link.href = result.pdf_full_url || result.pdf_url;
                 link.download = `${data.invoice_number || 'Rechnung'}.pdf`;
                 document.body.appendChild(link);
                 link.click();
@@ -411,6 +432,21 @@ const InvoiceCreator = {
                 if (this.currentModule === 'private' && typeof PrivateModule !== 'undefined') {
                     await PrivateModule.loadInvoices();
                     await PrivateModule.loadStats();
+                    // Try to load and open the newly created invoice so the viewer shows the file immediately
+                    try {
+                        if (result && result.id) {
+                            const inv = await API.get('/api/private.php?action=getInvoice&id=' + encodeURIComponent(result.id));
+                            if (inv) {
+                                // Ensure PrivateModule has the invoice cached
+                                PrivateModule.lastInvoices = PrivateModule.lastInvoices || {};
+                                PrivateModule.lastInvoices[result.id] = inv;
+                                // Open viewer for the new invoice
+                                PrivateModule.openInvoiceViewer(result.id);
+                            }
+                        }
+                    } catch (e) {
+                        console.debug('Could not auto-open invoice viewer for new invoice', e);
+                    }
                 } else if (this.currentModule === 'shared' && typeof SharedModule !== 'undefined') {
                     await SharedModule.loadInvoices();
                     await SharedModule.loadStats();
@@ -421,10 +457,20 @@ const InvoiceCreator = {
             
         } catch (error) {
             console.error('Error creating invoice:', error);
-            if (typeof App !== 'undefined') {
-                App.showToast('Fehler beim Erstellen: ' + (error.message || 'Unbekannter Fehler'), 'error');
+            // If server returned structured validation errors, show them in a friendly way
+            if (error.validation && Array.isArray(error.validation) && error.validation.length > 0) {
+                const messages = error.validation.map(e => (e.field ? e.field + ': ' : '') + e.message).join('\n');
+                if (typeof App !== 'undefined') {
+                    App.showToast('Validierungsfehler:\n' + messages, 'error', { timeout: 8000 });
+                } else {
+                    alert('Validierungsfehler:\n' + messages);
+                }
             } else {
-                alert('Fehler beim Erstellen: ' + (error.message || 'Unbekannter Fehler'));
+                if (typeof App !== 'undefined') {
+                    App.showToast('Fehler beim Erstellen: ' + (error.message || 'Unbekannter Fehler'), 'error');
+                } else {
+                    alert('Fehler beim Erstellen: ' + (error.message || 'Unbekannter Fehler'));
+                }
             }
         } finally {
             submitBtn.disabled = false;

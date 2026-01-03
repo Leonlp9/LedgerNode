@@ -21,13 +21,31 @@ class InvoicePDFGenerator
     public function generate(array $data): string
     {
         // Validate required fields
-        $required = ['invoice_number', 'invoice_date', 'sender', 'recipient', 'line_items', 'amount'];
+        $required = ['invoice_number', 'invoice_date', 'sender', 'recipient'];
         foreach ($required as $field) {
             if (empty($data[$field])) {
                 throw new \InvalidArgumentException("Required field missing: {$field}");
             }
         }
-        
+
+        // Normalize line_items: accept JSON string or array
+        $lineItems = [];
+        if (isset($data['line_items'])) {
+            if (is_string($data['line_items'])) {
+                $decoded = json_decode($data['line_items'], true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new \InvalidArgumentException('line_items contains invalid JSON: ' . json_last_error_msg());
+                }
+                $lineItems = $decoded;
+            } elseif (is_array($data['line_items'])) {
+                $lineItems = $data['line_items'];
+            } else {
+                throw new \InvalidArgumentException('line_items must be a JSON string or an array');
+            }
+        } else {
+            throw new \InvalidArgumentException('Required field missing: line_items');
+        }
+
         // Create new PDF document
         $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         
@@ -57,23 +75,17 @@ class InvoicePDFGenerator
         // Output HTML content
         $pdf->writeHTML($html, true, false, true, false, '');
         
-        // Generate filename
-        $filename = $this->sanitizeFilename($data['invoice_number']) . '.pdf';
-        $uploadDir = __DIR__ . '/../../uploads/invoices/';
-        
-        // Create directory if it doesn't exist
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-        
-        $filepath = $uploadDir . $filename;
-        
-        // Save PDF to file
+        // Generate filename and write to system temporary directory
+        $filename = $this->sanitizeFilename($data['invoice_number']) . '_' . bin2hex(random_bytes(6)) . '.pdf';
+        $tempDir = sys_get_temp_dir();
+        $filepath = rtrim($tempDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $filename;
+
+        // Save PDF to file (temporary location)
         $pdf->Output($filepath, 'F');
-        
-        return $filepath;
-    }
-    
+
+         return $filepath;
+     }
+
     /**
      * Generate HTML content for the PDF
      */
@@ -92,9 +104,14 @@ class InvoicePDFGenerator
         $subtotal = 0;
         $taxTotal = 0;
         foreach ($lineItems as $item) {
-            $lineTotal = $item['quantity'] * $item['price'];
+            // Basic defensive defaults
+            $qty = isset($item['quantity']) ? (float)$item['quantity'] : 0;
+            $price = isset($item['price']) ? (float)$item['price'] : 0;
+            $tax = isset($item['tax']) ? (float)$item['tax'] : 0;
+
+            $lineTotal = $qty * $price;
             $subtotal += $lineTotal;
-            $taxTotal += $lineTotal * ($item['tax'] / 100);
+            $taxTotal += $lineTotal * ($tax / 100);
         }
         $total = $subtotal + $taxTotal;
         
@@ -105,15 +122,19 @@ class InvoicePDFGenerator
         // Build line items HTML
         $lineItemsHTML = '';
         foreach ($lineItems as $item) {
-            $lineTotal = $item['quantity'] * $item['price'];
-            $lineTax = $lineTotal * ($item['tax'] / 100);
+            $qty = isset($item['quantity']) ? (float)$item['quantity'] : 0;
+            $price = isset($item['price']) ? (float)$item['price'] : 0;
+            $tax = isset($item['tax']) ? (float)$item['tax'] : 0;
+
+            $lineTotal = $qty * $price;
+            $lineTax = $lineTotal * ($tax / 100);
             $lineGross = $lineTotal + $lineTax;
             
             $lineItemsHTML .= '<tr>
-                <td>' . htmlspecialchars($item['description']) . '</td>
+                <td>' . htmlspecialchars($item['description'] ?? '') . '</td>
                 <td style="text-align: right;">' . number_format($item['quantity'], 2, ',', '.') . '</td>
-                <td style="text-align: right;">' . number_format($item['price'], 2, ',', '.') . ' €</td>
-                <td style="text-align: right;">' . number_format($item['tax'], 2, ',', '.') . '%</td>
+                <td style="text-align: right;">' . number_format($price, 2, ',', '.') . ' €</td>
+                <td style="text-align: right;">' . number_format($tax, 2, ',', '.') . '%</td>
                 <td style="text-align: right;">' . number_format($lineGross, 2, ',', '.') . ' €</td>
             </tr>';
         }

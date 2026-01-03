@@ -164,6 +164,14 @@ class PrivateInvoices
             $fileName = $file['name'];
         }
 
+        // If the caller provided a prepared file path (e.g. generated PDF), accept it
+        if (empty($filePath) && !empty($data['file_path'])) {
+            // Normalize to realpath when possible
+            $possible = realpath($data['file_path']) ?: $data['file_path'];
+            $filePath = $possible;
+            $fileName = $data['file_name'] ?? basename($possible);
+        }
+
         // Prepare data for insertion
         // Normalize due_date: convert empty string to null to avoid SQL errors for DATE columns
         $dueRaw = isset($data['due_date']) ? trim((string)$data['due_date']) : '';

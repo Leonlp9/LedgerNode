@@ -132,6 +132,93 @@ try {
                 throw new RuntimeException('Nur POST erlaubt');
             }
             
+            // Server-side validation for better error messages
+            $validationErrors = [];
+            $input = $_POST;
+
+            // Required fields basic check
+            $required = ['invoice_number', 'invoice_date', 'sender', 'recipient', 'line_items'];
+            foreach ($required as $f) {
+                if (!isset($input[$f]) || $input[$f] === '' || $input[$f] === null) {
+                    $validationErrors[] = [
+                        'field' => $f,
+                        'message' => 'Dieses Feld wird benötigt.'
+                    ];
+                }
+            }
+
+            // If line_items exists try to decode and validate structure
+            if (isset($input['line_items']) && $input['line_items'] !== '') {
+                $raw = $input['line_items'];
+                $decoded = null;
+                if (is_string($raw)) {
+                    $decoded = json_decode($raw, true);
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        $validationErrors[] = [
+                            'field' => 'line_items',
+                            'message' => 'Ungültiges JSON: ' . json_last_error_msg()
+                        ];
+                    }
+                } elseif (is_array($raw)) {
+                    $decoded = $raw;
+                } else {
+                    $validationErrors[] = [
+                        'field' => 'line_items',
+                        'message' => 'Erwartet JSON-Array oder Array.'
+                    ];
+                }
+
+                if (is_array($decoded)) {
+                    // Validate each item
+                    foreach ($decoded as $idx => $item) {
+                        $prefix = "line_items[{$idx}]";
+                        if (!is_array($item)) {
+                            $validationErrors[] = ['field' => $prefix, 'message' => 'Position muss ein Objekt/Array sein.'];
+                            continue;
+                        }
+                        // description
+                        if (empty($item['description'])) {
+                            $validationErrors[] = ['field' => $prefix . '.description', 'message' => 'Beschreibung fehlt.'];
+                        }
+                        // quantity
+                        if (!isset($item['quantity']) || !is_numeric($item['quantity']) || $item['quantity'] <= 0) {
+                            $validationErrors[] = ['field' => $prefix . '.quantity', 'message' => 'Menge muss eine Zahl > 0 sein.'];
+                        }
+                        // price
+                        if (!isset($item['price']) || !is_numeric($item['price']) || $item['price'] < 0) {
+                            $validationErrors[] = ['field' => $prefix . '.price', 'message' => 'Preis muss eine Zahl >= 0 sein.'];
+                        }
+                        // tax
+                        // Accept missing tax (default to 0). If present, it must be numeric and >= 0
+                        if (!isset($item['tax'])) {
+                            // ok - will default to 0 later when generating
+                        } elseif (!is_numeric($item['tax']) || $item['tax'] < 0) {
+                            $validationErrors[] = ['field' => $prefix . '.tax', 'message' => 'MwSt. muss eine Zahl >= 0 sein.'];
+                        }
+                    }
+                }
+            }
+
+            // If validation errors occurred, return structured 422 response
+            if (!empty($validationErrors)) {
+                // Debug: log received POST keys to server error log to help track missing fields
+                try {
+                    error_log('createInvoiceWithPDF validation failed. Received POST keys: ' . json_encode(array_keys($_POST)));
+                    if (isset($_POST['line_items'])) {
+                        error_log('createInvoiceWithPDF received line_items length: ' . strlen($_POST['line_items']));
+                    }
+                } catch (\Throwable $logEx) {
+                    // ignore logging errors
+                }
+                http_response_code(422);
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Validierung fehlgeschlagen',
+                    'errors' => $validationErrors
+                ]);
+                exit;
+            }
+
             // Use the PDF generator
             require_once __DIR__ . '/../src/Services/InvoicePDFGenerator.php';
             $pdfGenerator = new \App\Services\InvoicePDFGenerator();
@@ -143,27 +230,68 @@ try {
             $handler = new PrivateInvoices();
             $invoiceData = $_POST;
             
-            // Convert relative path to web-accessible path
+            // Ensure the generated PDF is web-accessible. We'll copy it into public/uploads/invoices
             $basePath = dirname(__DIR__);
-            $relativePath = str_replace($basePath, '', $pdfPath);
+            // Use the project's uploads directory so FileUpload::getFileUrl can map it to /uploads/...
+            $uploadBase = $basePath . DIRECTORY_SEPARATOR . 'uploads';
+            $year = date('Y');
+            $month = date('m');
+            $targetDir = $uploadBase . DIRECTORY_SEPARATOR . $year . DIRECTORY_SEPARATOR . $month;
+            if (!is_dir($targetDir)) {
+                @mkdir($targetDir, 0755, true);
+            }
 
-            // Create file array for PrivateInvoices handler
+            $destPath = $targetDir . DIRECTORY_SEPARATOR . basename($pdfPath);
+            $relativePath = null;
             $fakeFile = null;
+
             if (file_exists($pdfPath)) {
-                $invoiceData['file_path'] = $relativePath;
-                $invoiceData['file_name'] = basename($pdfPath);
+                // Copy into uploads/YYYY/MM/ so FileUpload->getFileUrl will work
+                $copied = @copy($pdfPath, $destPath);
+                $moved = false;
+                if (!$copied) {
+                    // fallback to rename (move)
+                    $moved = @rename($pdfPath, $destPath);
+                }
+
+                // If copy succeeded, remove the original temp file to avoid duplicates
+                if ($copied) {
+                    try { @unlink($pdfPath); } catch (\Throwable $_) { /* ignore */ }
+                }
+
+                // Store absolute filesystem path in DB so FileUpload can work with it
+                $invoiceData['file_path'] = realpath($destPath) ?: $destPath;
+                $invoiceData['file_name'] = basename($destPath);
+                // Also compute a relative URL for immediate response (client can use file_url from GET later)
+                $relativePath = str_replace('\\', '/', str_replace($basePath, '', $invoiceData['file_path']));
+                if (substr($relativePath, 0, 1) !== '/') $relativePath = '/' . $relativePath;
             }
 
             $result = $handler->createInvoice($invoiceData, $fakeFile);
-            
-            // Return success with PDF URL
+
+             // Return success with PDF URL
+            // Build full URL if possible
+            $fullUrl = null;
+            $docRoot = realpath($_SERVER['DOCUMENT_ROOT'] ?? '');
+            if ($docRoot && !empty($invoiceData['file_path'])) {
+                $real = realpath($invoiceData['file_path']);
+                if ($real && strpos($real, $docRoot) === 0) {
+                    $urlPath = str_replace('\\', '/', substr($real, strlen($docRoot)));
+                    if (substr($urlPath, 0, 1) !== '/') $urlPath = '/' . $urlPath;
+                    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                    $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? 'localhost');
+                    $fullUrl = $scheme . '://' . $host . $urlPath;
+                }
+            }
+
             sendSuccess([
                 'id' => $result['id'],
                 'message' => $result['message'],
                 'pdf_url' => $relativePath,
+                'pdf_full_url' => $fullUrl,
                 'pdf_path' => $pdfPath
             ]);
-            break;
+             break;
 
         case 'generateBackup':
             if ($method !== 'POST') {

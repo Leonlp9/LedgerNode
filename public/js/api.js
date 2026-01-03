@@ -93,6 +93,10 @@ const API = {
                     if (data.details) err.details = data.details;
                     // Manche Endpoints packen die nützlichen Infos unter data.details
                     if (data.data && data.data.details) err.details = data.data.details;
+                    // Attach validation errors (common field: errors)
+                    if (data.errors) {
+                        err.validation = data.errors;
+                    }
                     throw err;
                 }
 
