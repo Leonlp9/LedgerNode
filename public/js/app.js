@@ -39,6 +39,9 @@ const App = {
         // Initialize tabs for current module
         this.updateTabs();
 
+        // Mobile Menu Toggle
+        this.initMobileMenu();
+
         // Modul aus URL-Hash laden
         const hash = window.location.hash.substring(1);
         if (hash && ['private', 'shared'].includes(hash)) {
@@ -75,6 +78,67 @@ const App = {
         if (isServer || (!isServer && serverUrl)) {
             Updater.init();
         }
+    },
+
+    /**
+     * Mobile Menu Initialisierung
+     */
+    initMobileMenu() {
+        const menuToggle = document.getElementById('mobile-menu-toggle');
+        const sidebar = document.querySelector('.sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+
+        if (!menuToggle || !sidebar) return;
+
+        // Toggle mobile menu
+        menuToggle.addEventListener('click', () => {
+            const isOpen = sidebar.classList.toggle('open');
+            menuToggle.classList.toggle('active');
+
+            if (backdrop) {
+                backdrop.classList.toggle('active', isOpen);
+            }
+        });
+
+        // Close menu when clicking on backdrop
+        if (backdrop) {
+            backdrop.addEventListener('click', () => {
+                sidebar.classList.remove('open');
+                menuToggle.classList.remove('active');
+                backdrop.classList.remove('active');
+            });
+        }
+
+        // Close menu when clicking on a nav item
+        const navItems = sidebar.querySelectorAll('.nav-item, .module-switch-btn');
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                // Auf mobilen Geräten Menü schließen
+                if (window.innerWidth <= 1024) {
+                    sidebar.classList.remove('open');
+                    menuToggle.classList.remove('active');
+                    if (backdrop) {
+                        backdrop.classList.remove('active');
+                    }
+                }
+            });
+        });
+
+        // Handle window resize
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                // Schließe mobile Menü wenn Fenster vergrößert wird
+                if (window.innerWidth > 1024) {
+                    sidebar.classList.remove('open');
+                    menuToggle.classList.remove('active');
+                    if (backdrop) {
+                        backdrop.classList.remove('active');
+                    }
+                }
+            }, 250);
+        });
     },
 
     /**

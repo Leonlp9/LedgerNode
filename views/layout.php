@@ -23,6 +23,13 @@ $assetVersion = time();
     <!-- Header -->
     <header class="header">
         <div class="container">
+            <!-- Mobile Menu Toggle -->
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Menü öffnen">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
             <!-- Logo als Bild statt Text -->
             <a href="<?= htmlspecialchars($basePath ?: '/') ?>" class="logo-link">
                 <img src="<?= htmlspecialchars($basePath . '/logo.png') ?>" alt="<?= htmlspecialchars(\App\Core\Config::get('APP.name', 'Accounting')) ?>" class="logo-img">
@@ -32,6 +39,9 @@ $assetVersion = time();
     </header>
 
     <div class="app-container">
+        <!-- Sidebar Backdrop for Mobile -->
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <nav class="nav" id="tab-nav">
