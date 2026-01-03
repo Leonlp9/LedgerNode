@@ -478,11 +478,15 @@ class Server
             $fileName = $_FILES['file']['name'];
         }
 
+        // Prepare data for insertion
+        $dueRaw = isset($_POST['due_date']) ? trim((string)$_POST['due_date']) : '';
+        $dueDate = $dueRaw !== '' ? $dueRaw : null;
+
         $data = [
             'type' => $_POST['type'],
             'invoice_number' => $_POST['invoice_number'] ?? null,
             'invoice_date' => $_POST['invoice_date'],
-            'due_date' => $_POST['due_date'] ?? null,
+            'due_date' => $dueDate,
             'amount' => $_POST['amount'],
             'sender' => $_POST['sender'],
             'recipient' => $_POST['recipient'],
@@ -822,11 +826,14 @@ class Server
         $relativePath = str_replace($basePath, '', $pdfPath);
         
         // Prepare invoice data for database
+        $dueRaw = isset($_POST['due_date']) ? trim((string)$_POST['due_date']) : '';
+        $dueDate = $dueRaw !== '' ? $dueRaw : null;
+
         $data = [
             'type' => $_POST['type'] ?? $_POST['invoice_type'],
             'invoice_number' => $_POST['invoice_number'],
             'invoice_date' => $_POST['invoice_date'],
-            'due_date' => $_POST['due_date'] ?? null,
+            'due_date' => $dueDate,
             'amount' => $_POST['amount'],
             'sender' => $_POST['sender'],
             'recipient' => $_POST['recipient'],

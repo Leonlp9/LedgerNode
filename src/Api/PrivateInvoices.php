@@ -165,11 +165,15 @@ class PrivateInvoices
         }
 
         // Prepare data for insertion
+        // Normalize due_date: convert empty string to null to avoid SQL errors for DATE columns
+        $dueRaw = isset($data['due_date']) ? trim((string)$data['due_date']) : '';
+        $dueDate = $dueRaw !== '' ? $dueRaw : null;
+
         $insertData = [
             'type' => $data['type'],
             'invoice_number' => $data['invoice_number'] ?? null,
             'invoice_date' => $data['invoice_date'],
-            'due_date' => $data['due_date'] ?? null,
+            'due_date' => $dueDate,
             'amount' => $data['amount'],
             'sender' => $data['sender'],
             'recipient' => $data['recipient'],
@@ -227,7 +231,13 @@ class PrivateInvoices
         foreach ($allowedFields as $field) {
             if (array_key_exists($field, $data)) {
                 $updateFields[] = "{$field} = :{$field}";
-                $bindings[":{$field}"] = $data[$field];
+                // Convert empty due_date string to null for DATE columns
+                if ($field === 'due_date') {
+                    $valRaw = isset($data['due_date']) ? trim((string)$data['due_date']) : '';
+                    $bindings[":{$field}"] = $valRaw !== '' ? $valRaw : null;
+                } else {
+                    $bindings[":{$field}"] = $data[$field];
+                }
             }
         }
 
