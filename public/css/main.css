@@ -1320,21 +1320,24 @@ a:hover {
     border-bottom: 2px solid var(--gray-200);
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    /* Fix: Verhindert unnötige vertikale Scrollbar */
+    overflow-y: hidden;
 }
 
 .subtab-btn {
     padding: var(--spacing-md) var(--spacing-lg);
     background: transparent;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-bottom: 3px solid transparent;
     cursor: pointer;
     font-size: 0.95rem;
     font-weight: 500;
     color: var(--gray-600);
     transition: all var(--transition-base);
-    margin-bottom: -2px;
     white-space: nowrap;
     flex-shrink: 0;
+    /* Fix: Border liegt jetzt direkt am Button, kein negatives Margin */
+    position: relative;
 }
 
 .subtab-btn:hover {
