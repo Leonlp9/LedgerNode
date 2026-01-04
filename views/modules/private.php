@@ -707,6 +707,14 @@
             </div>
 
             <div class="form-group">
+                <label for="private-tx-category">Kategorie (optional)</label>
+                <input type="text"
+                       id="private-tx-category"
+                       name="category"
+                       placeholder="z.B. Lebensmittel, Miete">
+            </div>
+
+            <div class="form-group">
                 <label for="private-tx-date">Datum</label>
                 <input type="date" 
                        id="private-tx-date" 
@@ -989,7 +997,13 @@ const PrivateModule = {
         // Expenses by category
         let expensesByCat;
         try {
-            expensesByCat = await API.get('/api/private/stats/expenses_by_category');
+            const resp = await API.get('/api/private/stats/expenses_by_category');
+            // API.get may return either the raw data array or an envelope {success: true, data: [...]}
+            if (resp && typeof resp === 'object' && Array.isArray(resp.data)) {
+                expensesByCat = resp.data;
+            } else {
+                expensesByCat = resp;
+            }
         } catch (e) {
             console.debug('Expenses by category API nicht erreichbar, nutze Platzhalterdaten', e);
             expensesByCat = null;
@@ -1003,6 +1017,12 @@ const PrivateModule = {
                 { category: 'Freizeit', amount: 90 }
             ];
         }
+
+        // Normalize entries: ensure category label and numeric amount
+        expensesByCat = expensesByCat.map(e => ({
+            category: (e && (e.category || e.cat || e.name)) ? String(e.category || e.cat || e.name) : 'Nicht kategorisiert',
+            amount: Number((e && (e.amount || e.total || e.value)) ? (e.amount || e.total || e.value) : 0)
+        }));
 
         const labels = expensesByCat.map(e => e.category);
         const data = expensesByCat.map(e => e.amount);

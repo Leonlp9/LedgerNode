@@ -509,6 +509,11 @@ if (preg_match('#^/api/private(?:\.php)?(?:[\/\?].*)?$#', $reqPath) && !Config::
                 'created_at' => date('Y-m-d H:i:s')
             ];
 
+            // Optional: category field
+            if (isset($input['category']) && $input['category'] !== '') {
+                $data['category'] = (string) $input['category'];
+            }
+
             $id = $db->insertArray('private_transactions', $data);
 
             echo json_encode(['success' => true, 'data' => ['id' => $id, 'message' => 'Transaktion erstellt']]);

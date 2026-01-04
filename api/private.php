@@ -398,6 +398,26 @@ try {
             ]);
             break;
 
+        // Expenses by category (allow clients to call the same stat)
+        case 'expenses_by_category':
+            try {
+                $db = Database::getInstance();
+                $sql = "SELECT COALESCE(category, 'Uncategorized') as category, COALESCE(SUM(amount), 0) as total FROM private_transactions WHERE `type` = 'expense' GROUP BY category ORDER BY total DESC";
+                $rows = $db->fetchAll($sql);
+
+                $result = array_map(function($r) {
+                    return ['category' => $r['category'], 'amount' => (float) $r['total']];
+                }, $rows ?: []);
+
+                sendSuccess($result);
+            } catch (Throwable $e) {
+                // Log and return a generic error
+                error_log('expenses_by_category error: ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Fehler beim Berechnen der Ausgaben nach Kategorie']);
+            }
+            break;
+
         // Private transactions
         case 'transactions':
             $db = Database::getInstance();
