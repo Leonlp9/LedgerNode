@@ -126,3 +126,4 @@ storage/uploads/*
 .htpasswd
 auth.json
 oauth-*.json
+*.bak
