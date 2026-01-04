@@ -164,6 +164,121 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// --- PROXY-Handler für Client-to-Server-API-Weiterleitung (nur für localhost/Debug) ---
+// WICHTIG: Dieser Handler muss VOR allen anderen Handlern kommen, damit er Proxy-Requests abfängt
+// Dieser Handler ermöglicht es localhost-Clients, API-Aufrufe an entfernte Server zu machen,
+// ohne CORS-Probleme zu bekommen. Der lokale Endpunkt fungiert als Proxy.
+$rawInputForProxy = file_get_contents('php://input');
+$jsonInputForProxy = json_decode($rawInputForProxy, true);
+
+if (is_array($jsonInputForProxy) && !empty($jsonInputForProxy['__proxy'])) {
+    // Nur erlauben wenn Origin zugelassen oder Debug-Modus (Sicherheit!)
+    $allowProxy = false;
+    if ($allow || $debugMode) {
+        $allowProxy = true;
+    }
+
+    if (!$allowProxy) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Proxy not allowed from this origin']);
+        exit;
+    }
+
+    $target = isset($jsonInputForProxy['target_url']) ? $jsonInputForProxy['target_url'] : null;
+    $method = isset($jsonInputForProxy['method']) ? strtoupper($jsonInputForProxy['method']) : 'POST';
+
+    if (!$target) {
+        http_response_code(400);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'No target_url provided']);
+        exit;
+    }
+
+    // Baue Payload: entferne Proxy-spezifische Felder
+    $payload = isset($jsonInputForProxy['payload']) ? $jsonInputForProxy['payload'] : [];
+
+    // Optional: X-API-Key weitergeben
+    $forwardApiKey = isset($jsonInputForProxy['x_api_key']) ? $jsonInputForProxy['x_api_key'] : null;
+
+    // Verwende cURL wenn verfügbar, sonst file_get_contents mit Context
+    if (function_exists('curl_init')) {
+        $ch = curl_init();
+
+        if ($method === 'GET') {
+            $query = http_build_query($payload);
+            $urlWithQuery = $target . (strpos($target, '?') === false ? '?' : '&') . $query;
+            curl_setopt($ch, CURLOPT_URL, $urlWithQuery);
+            curl_setopt($ch, CURLOPT_HTTPGET, true);
+            $headers = ['Accept: application/json'];
+            if ($forwardApiKey) $headers[] = 'X-API-Key: ' . $forwardApiKey;
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        } else {
+            curl_setopt($ch, CURLOPT_URL, $target);
+            curl_setopt($ch, CURLOPT_POST, true);
+            $body = json_encode($payload);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+            $headers = ['Content-Type: application/json', 'Accept: application/json'];
+            if ($forwardApiKey) $headers[] = 'X-API-Key: ' . $forwardApiKey;
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        }
+
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+
+        $response = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE) ?: 500;
+        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: 'application/json';
+        curl_close($ch);
+
+        if ($response === false) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Proxy cURL request failed', 'details' => $curlError]);
+            exit;
+        }
+
+        http_response_code($httpCode);
+        header('Content-Type: ' . $contentType);
+        echo $response;
+        exit;
+    } else {
+        // fallback: file_get_contents
+        $headers = "Accept: application/json\r\nContent-Type: application/json\r\n";
+        if ($forwardApiKey) {
+            $headers .= 'X-API-Key: ' . $forwardApiKey . "\r\n";
+        }
+
+        $opts = [
+            'http' => [
+                'method' => $method,
+                'header' => $headers,
+                'content' => ($method === 'GET') ? null : json_encode($payload),
+                'timeout' => 30,
+                'ignore_errors' => true
+            ]
+        ];
+        $context = stream_context_create($opts);
+        $url = $target;
+        if ($method === 'GET' && !empty($payload)) {
+            $url .= (strpos($url, '?') === false ? '?' : '&') . http_build_query($payload);
+        }
+
+        $response = @file_get_contents($url, false, $context);
+        $httpCode = 200;
+        if (isset($http_response_header) && preg_match('#HTTP/\d+\.\d+\s+(\d+)#', $http_response_header[0], $m)) {
+            $httpCode = (int) $m[1];
+        }
+        header('Content-Type: application/json');
+        http_response_code($httpCode);
+        echo $response === false ? json_encode(['success' => false, 'error' => 'Proxy request failed']) : $response;
+        exit;
+    }
+}
+
 // Fehlerbehandlung
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
@@ -666,120 +781,6 @@ if (preg_match('#^/api/private(?:\.php)?(?:[\/\?].*)?$#', $reqPath) && !Config::
     http_response_code(404);
     echo json_encode(['success' => false, 'error' => 'Not Found (private-api)']);
     exit;
-}
-
-// --- PROXY-Handler für Client-to-Server-API-Weiterleitung (nur für localhost/Debug) ---
-// Dieser Handler ermöglicht es localhost-Clients, API-Aufrufe an entfernte Server zu machen,
-// ohne CORS-Probleme zu bekommen. Der lokale Endpunkt fungiert als Proxy.
-$rawInputForProxy = file_get_contents('php://input');
-$jsonInputForProxy = json_decode($rawInputForProxy, true);
-
-if (is_array($jsonInputForProxy) && !empty($jsonInputForProxy['__proxy'])) {
-    // Nur erlauben wenn Origin zugelassen oder Debug-Modus (Sicherheit!)
-    $allowProxy = false;
-    if ($allow || (isset($debugMode) && $debugMode)) {
-        $allowProxy = true;
-    }
-
-    if (!$allowProxy) {
-        http_response_code(403);
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'error' => 'Proxy not allowed from this origin']);
-        exit;
-    }
-
-    $target = isset($jsonInputForProxy['target_url']) ? $jsonInputForProxy['target_url'] : null;
-    $method = isset($jsonInputForProxy['method']) ? strtoupper($jsonInputForProxy['method']) : 'POST';
-
-    if (!$target) {
-        http_response_code(400);
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'error' => 'No target_url provided']);
-        exit;
-    }
-
-    // Baue Payload: entferne Proxy-spezifische Felder
-    $payload = isset($jsonInputForProxy['payload']) ? $jsonInputForProxy['payload'] : [];
-
-    // Optional: X-API-Key weitergeben
-    $forwardApiKey = isset($jsonInputForProxy['x_api_key']) ? $jsonInputForProxy['x_api_key'] : null;
-
-    // Verwende cURL wenn verfügbar, sonst file_get_contents mit Context
-    if (function_exists('curl_init')) {
-        $ch = curl_init();
-
-        if ($method === 'GET') {
-            $query = http_build_query($payload);
-            $urlWithQuery = $target . (strpos($target, '?') === false ? '?' : '&') . $query;
-            curl_setopt($ch, CURLOPT_URL, $urlWithQuery);
-            curl_setopt($ch, CURLOPT_HTTPGET, true);
-            $headers = ['Accept: application/json'];
-            if ($forwardApiKey) $headers[] = 'X-API-Key: ' . $forwardApiKey;
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        } else {
-            curl_setopt($ch, CURLOPT_URL, $target);
-            curl_setopt($ch, CURLOPT_POST, true);
-            $body = json_encode($payload);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-            $headers = ['Content-Type: application/json', 'Accept: application/json'];
-            if ($forwardApiKey) $headers[] = 'X-API-Key: ' . $forwardApiKey;
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        }
-
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-
-        $response = curl_exec($ch);
-        $curlError = curl_error($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE) ?: 500;
-        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: 'application/json';
-        curl_close($ch);
-
-        if ($response === false) {
-            http_response_code(500);
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'error' => 'Proxy cURL request failed', 'details' => $curlError]);
-            exit;
-        }
-
-        http_response_code($httpCode);
-        header('Content-Type: ' . $contentType);
-        echo $response;
-        exit;
-    } else {
-        // fallback: file_get_contents
-        $headers = "Accept: application/json\r\nContent-Type: application/json\r\n";
-        if ($forwardApiKey) {
-            $headers .= 'X-API-Key: ' . $forwardApiKey . "\r\n";
-        }
-
-        $opts = [
-            'http' => [
-                'method' => $method,
-                'header' => $headers,
-                'content' => ($method === 'GET') ? null : json_encode($payload),
-                'timeout' => 30,
-                'ignore_errors' => true
-            ]
-        ];
-        $context = stream_context_create($opts);
-        $url = $target;
-        if ($method === 'GET' && !empty($payload)) {
-            $url .= (strpos($url, '?') === false ? '?' : '&') . http_build_query($payload);
-        }
-
-        $response = @file_get_contents($url, false, $context);
-        $httpCode = 200;
-        if (isset($http_response_header) && preg_match('#HTTP/\d+\.\d+\s+(\d+)#', $http_response_header[0], $m)) {
-            $httpCode = (int) $m[1];
-        }
-        header('Content-Type: application/json');
-        http_response_code($httpCode);
-        echo $response === false ? json_encode(['success' => false, 'error' => 'Proxy request failed']) : $response;
-        exit;
-    }
 }
 
 try {
