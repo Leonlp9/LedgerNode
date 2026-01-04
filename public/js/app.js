@@ -48,6 +48,11 @@ const App = {
             this.switchModule(hash, false);
         }
 
+        // Delegierte Delete-Confirm-Initialisierung
+        // Fängt Klicks auf mögliche "Löschen"-Buttons/Links ab und zeigt das Custom-Confirm-Modal
+        // bevor die ursprüngliche Aktion (Form-Submit / Navigation / onclick) ausgeführt wird.
+        this.initDeleteConfirmDelegation();
+
         // Hash-Change-Listener
         window.addEventListener('hashchange', () => {
             const newHash = window.location.hash.substring(1);
@@ -422,6 +427,106 @@ const App = {
         }
         // Fallback to native confirm if custom dialog not available
         return window.confirm(message);
+    },
+
+    /**
+     * Init delegated listener to intercept delete clicks and show a custom confirm dialog.
+     * Runs in capture phase so we can intercept before inline onclick handlers.
+     */
+    initDeleteConfirmDelegation() {
+        // Helper: determine closest actionable element from event path
+        const findActionable = (event) => {
+            const path = (event.composedPath && event.composedPath()) || event.path || [];
+            if (!path || path.length === 0) {
+                // Fallback: walk up from target
+                let node = event.target;
+                while (node) {
+                    if (node.nodeType === 1 && node.matches && node.matches('button, a, [data-action], input[type="submit"], [role="button"]')) return node;
+                    node = node.parentElement;
+                }
+                return null;
+            }
+            for (const node of path) {
+                if (!node || node.nodeType !== 1) continue;
+                try {
+                    if (node.matches && node.matches('button, a, [data-action], input[type="submit"], [role="button"]')) return node;
+                } catch (e) {
+                    // ignore
+                }
+            }
+            return null;
+        };
+
+        const delegate = async (event) => {
+            try {
+                if (event.defaultPrevented) return;
+
+                const el = findActionable(event);
+                if (!el) return;
+
+                // If already confirmed by us, don't intercept
+                if (el.dataset && el.dataset.cdConfirmed === '1') return;
+
+                const onclick = (el.getAttribute && el.getAttribute('onclick')) || '';
+                const title = (el.getAttribute && el.getAttribute('title')) || '';
+                const aria = (el.getAttribute && el.getAttribute('aria-label')) || '';
+                const dataAction = (el.getAttribute && el.getAttribute('data-action')) || '';
+                const href = (el.getAttribute && el.getAttribute('href')) || '';
+                const classes = el.className || '';
+                const isSubmit = (el.matches && el.matches('input[type="submit"],button[type="submit"]')) || false;
+                const form = isSubmit ? el.closest('form') : el.closest('form');
+
+                const lowerOnclick = (onclick || '').toLowerCase();
+                // If the element's handler already uses confirm, skip to avoid double confirm
+                if (lowerOnclick.includes('app.confirm') || lowerOnclick.includes('customdialog.confirm') || lowerOnclick.includes('confirm(')) return;
+
+                const looksLikeDelete = (
+                    dataAction.toLowerCase() === 'delete' ||
+                    /löschen/i.test(title) ||
+                    /löschen/i.test(aria) ||
+                    /delete/i.test(classes) ||
+                    /löschen|delete/i.test(href) ||
+                    /delete[A-Za-z0-9_]*\s*\(/i.test(onclick || '') ||
+                    /löschen|delete/i.test((title || '') + ' ' + (aria || '')) ||
+                    (form && /delete/i.test((form.action || '')))
+                );
+
+                if (!looksLikeDelete) return;
+
+                // Intercept action and show confirm
+                try { event.preventDefault(); event.stopPropagation(); } catch (e) {}
+
+                const message = el.dataset.confirmMessage || el.dataset.confirm || aria || title || 'Wirklich löschen?';
+                const ok = await App.confirm(message);
+                if (!ok) return;
+
+                // Mark as confirmed so our programmatic click does not loop
+                try { if (el.dataset) el.dataset.cdConfirmed = '1'; } catch (e) {}
+
+                try {
+                    // Prefer triggering the original click so any inline handlers run.
+                    if (isSubmit && form) {
+                        // Programmatic click will trigger form submit handlers; data flag prevents re-intercept
+                        el.click();
+                    } else if (el.tagName && el.tagName.toLowerCase() === 'a' && href) {
+                        window.location.href = href;
+                    } else {
+                        el.click();
+                    }
+                } catch (err) {
+                    console.error('Fehler beim Ausführen der bestätigten Lösch-Aktion', err);
+                    try { App.showToast('Fehler beim Ausführen der Aktion', 'error'); } catch (e) {}
+                } finally {
+                    // Clean up marker shortly after
+                    setTimeout(() => { try { if (el.dataset) delete el.dataset.cdConfirmed; } catch (e) {} }, 500);
+                }
+            } catch (outerErr) {
+                console.error('Delete confirm delegation error', outerErr);
+            }
+        };
+
+        // Use capture so we intercept before inline onclick handlers in bubble phase
+        document.addEventListener('click', delegate, true);
     },
 
     /**
