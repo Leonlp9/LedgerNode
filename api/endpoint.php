@@ -15,15 +15,29 @@ use App\Core\Database;
 // Quick CORS preflight helper: send permissive headers early so OPTIONS/preflight gets a response
 if (isset($_SERVER['HTTP_ORIGIN'])) {
     $preOrigin = $_SERVER['HTTP_ORIGIN'];
-    header('Access-Control-Allow-Origin: ' . $preOrigin);
-    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    $preHeaders = 'X-API-Key, Content-Type, Authorization';
-    if (!empty($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {
-        $preHeaders = $preHeaders . ', ' . $_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'];
+    // Immer localhost-Origins erlauben (auch mit Ports)
+    $parsedPreHost = parse_url($preOrigin, PHP_URL_HOST);
+    $allowPre = false;
+    if ($parsedPreHost === 'localhost' || $parsedPreHost === '127.0.0.1' || $parsedPreHost === '::1' || $parsedPreHost === '[::1]' || stripos($preOrigin, 'localhost') !== false) {
+        $allowPre = true;
     }
-    header('Access-Control-Allow-Headers: ' . $preHeaders);
-    header('Vary: Origin');
-    header('Access-Control-Allow-Credentials: true');
+    // Auch andere erlaubte Origins
+    $allowedOriginsQuick = ['http://localhost', 'http://localhost:3000', 'http://127.0.0.1', 'http://127.0.0.1:8000'];
+    if (in_array($preOrigin, $allowedOriginsQuick, true)) {
+        $allowPre = true;
+    }
+
+    if ($allowPre) {
+        header('Access-Control-Allow-Origin: ' . $preOrigin);
+        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+        $preHeaders = 'X-API-Key, Content-Type, Authorization';
+        if (!empty($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {
+            $preHeaders = $preHeaders . ', ' . $_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'];
+        }
+        header('Access-Control-Allow-Headers: ' . $preHeaders);
+        header('Vary: Origin');
+        header('Access-Control-Allow-Credentials: true');
+    }
 }
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -39,20 +53,6 @@ $allowedOrigins = [
 ];
 $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
 
-// --- ALWAYS ALLOW LOCALHOST / LOOPBACK ORIGINS ----------------------------
-// Some dev setups use ports or IPv6 loopback not covered by a static allowlist.
-// Erkenne robust localhost- und loopback-Origins und markiere sie als erlaubt.
-if ($origin) {
-    $parsedHost = parse_url($origin, PHP_URL_HOST) ?: '';
-    // handle cases like 'http://localhost:3000', 'http://127.0.0.1:8000', 'http://[::1]'
-    if ($parsedHost === 'localhost' || $parsedHost === '127.0.0.1' || $parsedHost === '::1' || $parsedHost === '[::1]') {
-        $allow = true;
-    }
-    // Also allow origins that contain 'localhost' (covers unusual formats)
-    if (!$allow && stripos($origin, 'localhost') !== false) {
-        $allow = true;
-    }
-}
 
 // Hilfsfunktion: prüfe ob eine IPv4-Adresse in RFC1918 / Loopback Bereich liegt
 $ipIsPrivate = function(string $ip): bool {
@@ -88,6 +88,7 @@ $allow = false;
 // Immer localhost / loopback erlauben (Ports/Varianten abdecken)
 if ($origin) {
     $parsedHost = parse_url($origin, PHP_URL_HOST) ?: '';
+    // Erlaube localhost, 127.0.0.1, ::1 und alle Varianten
     if ($parsedHost === 'localhost' || $parsedHost === '127.0.0.1' || $parsedHost === '::1' || $parsedHost === '[::1]' || stripos($origin, 'localhost') !== false) {
         $allow = true;
     }
@@ -99,8 +100,8 @@ if ($origin && in_array($origin, $allowedOrigins, true)) {
     // Versuche Host aus Origin zu parsen
     $host = parse_url($origin, PHP_URL_HOST);
     if ($host !== null) {
-        // Direkte Hostnamen wie 'localhost'
-        if (in_array(strtolower($host), ['localhost'], true)) {
+        // Direkte Hostnamen wie 'localhost', '127.0.0.1', '::1'
+        if (in_array(strtolower($host), ['localhost', '127.0.0.1', '::1', '[::1]'], true)) {
             $allow = true;
         } else {
             // Falls Host eine IP ist oder sich auflösen lässt, prüfe privaten Bereich
@@ -121,11 +122,13 @@ if ($origin && in_array($origin, $allowedOrigins, true)) {
 }
 
 // Erlaube in DEV/DEBUG-Fällen breitere CORS-Rules damit localhost-Clients arbeiten können
-$debugMode = false;
+// WICHTIG: Wenn kein Debug-Mode explizit definiert ist, erlauben wir dennoch CORS für Entwicklung
+$debugMode = true; // Standardmäßig permissiv für Entwicklung
 try {
-    $debugMode = \App\Core\Config::get('APP.debug', false);
+    $debugMode = \App\Core\Config::get('APP.debug', true);
 } catch (\Throwable $e) {
-    // ignore
+    // Config noch nicht verfügbar - bleibe permissiv
+    $debugMode = true;
 }
 
 if ($allow || $debugMode) {
@@ -710,6 +713,9 @@ if (is_array($jsonInputForProxy) && !empty($jsonInputForProxy['__proxy'])) {
             $urlWithQuery = $target . (strpos($target, '?') === false ? '?' : '&') . $query;
             curl_setopt($ch, CURLOPT_URL, $urlWithQuery);
             curl_setopt($ch, CURLOPT_HTTPGET, true);
+            $headers = ['Accept: application/json'];
+            if ($forwardApiKey) $headers[] = 'X-API-Key: ' . $forwardApiKey;
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         } else {
             curl_setopt($ch, CURLOPT_URL, $target);
             curl_setopt($ch, CURLOPT_POST, true);
@@ -726,9 +732,17 @@ if (is_array($jsonInputForProxy) && !empty($jsonInputForProxy['__proxy'])) {
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 
         $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE) ?: 200;
+        $curlError = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE) ?: 500;
         $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: 'application/json';
         curl_close($ch);
+
+        if ($response === false) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Proxy cURL request failed', 'details' => $curlError]);
+            exit;
+        }
 
         http_response_code($httpCode);
         header('Content-Type: ' . $contentType);
@@ -736,10 +750,15 @@ if (is_array($jsonInputForProxy) && !empty($jsonInputForProxy['__proxy'])) {
         exit;
     } else {
         // fallback: file_get_contents
+        $headers = "Accept: application/json\r\nContent-Type: application/json\r\n";
+        if ($forwardApiKey) {
+            $headers .= 'X-API-Key: ' . $forwardApiKey . "\r\n";
+        }
+
         $opts = [
             'http' => [
                 'method' => $method,
-                'header' => "Accept: application/json\r\nContent-Type: application/json\r\n" . ($forwardApiKey ? 'X-API-Key: ' . $forwardApiKey . "\r\n" : ''),
+                'header' => $headers,
                 'content' => ($method === 'GET') ? null : json_encode($payload),
                 'timeout' => 30,
                 'ignore_errors' => true
