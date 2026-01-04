@@ -246,19 +246,35 @@ const API = {
             if (!/\/api\/endpoint\.php$/i.test(url)) {
                 url = url.replace(/\/$/, '') + '/api/endpoint.php';
             }
+
             if (method === 'GET') {
                 // GET: action + params als query
                 const u = new URL(url);
                 u.searchParams.append('action', action);
                 Object.keys(data || {}).forEach(k => u.searchParams.append(k, data[k]));
-                return this.request(u.toString(), { method: 'GET' });
+                try {
+                    return await this.request(u.toString(), { method: 'GET' });
+                } catch (err) {
+                    console.warn('[API] requestShared direct failed, trying local proxy fallback', err);
+                    // Fallback: send through local proxy endpoint
+                    const proxyBody = { __proxy: true, target_url: u.toString(), method: 'GET' };
+                    if (typeof window.CLIENT_API_KEY !== 'undefined' && window.CLIENT_API_KEY) proxyBody.x_api_key = window.CLIENT_API_KEY;
+                    return this.request(this.baseUrl + '/api/endpoint.php', { method: 'POST', body: JSON.stringify(proxyBody) });
+                }
             }
             // POST: sende JSON body { action, ...data }
             const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
             if (typeof window.CLIENT_API_KEY !== 'undefined' && window.CLIENT_API_KEY) {
                 headers['X-API-Key'] = window.CLIENT_API_KEY;
             }
-            return this.request(url, { method: 'POST', headers, body: JSON.stringify({ action, ...data }) });
+            try {
+                return await this.request(url, { method: 'POST', headers, body: JSON.stringify({ action, ...data }) });
+            } catch (err) {
+                console.warn('[API] requestShared direct POST failed, trying local proxy fallback', err);
+                const proxyBody = { __proxy: true, target_url: url, method: 'POST', payload: { action, ...data } };
+                if (typeof window.CLIENT_API_KEY !== 'undefined' && window.CLIENT_API_KEY) proxyBody.x_api_key = window.CLIENT_API_KEY;
+                return this.request(this.baseUrl + '/api/endpoint.php', { method: 'POST', body: JSON.stringify(proxyBody) });
+            }
         }
 
         // Fallback: lokale API (wie vorher)

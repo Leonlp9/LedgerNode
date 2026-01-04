@@ -18,22 +18,30 @@ const SharedModule = {
             ]);
         }
 
-        // Prüfe Server-Verbindung bei Clients
+        // Prüfe Server-Verbindung bei Clients, aber blockiere nicht den gesamten Init wenn Server nicht erreichbar
         if (!this.isServer) {
-            await this.checkServerConnection();
+            this.checkServerConnection().catch(e => console.warn('checkServerConnection failed', e));
         }
         
-        await this.loadStats();
-        await this.loadAccountsForSelect();
-        await this.loadAccountsPreview();
-        await this.loadTransactions();
-        await this.loadTransactionsPreview();
-        
-        // Setze heutiges Datum als Standard
-        document.getElementById('shared-tx-date').valueAsDate = new Date();
-        
-        // Initialize backup options
-        this.updateBackupOptions();
+        // Lade optionale Inhalte parallel, Fehler einzelner Calls dürfen Init nicht verhindern
+        const tasks = [];
+        tasks.push(this.loadStats().catch(e => { console.warn('loadStats failed', e); }));
+        tasks.push(this.loadAccountsForSelect().catch(e => { console.warn('loadAccountsForSelect failed', e); }));
+        tasks.push(this.loadAccountsPreview().catch(e => { console.warn('loadAccountsPreview failed', e); }));
+        tasks.push(this.loadTransactions().catch(e => { console.warn('loadTransactions failed', e); }));
+        tasks.push(this.loadTransactionsPreview().catch(e => { console.warn('loadTransactionsPreview failed', e); }));
+
+        // Setze heutiges Datum als Standard nur wenn das Element vorhanden ist
+        const sharedTxDateEl = document.getElementById('shared-tx-date');
+        if (sharedTxDateEl) {
+            try { sharedTxDateEl.valueAsDate = new Date(); } catch (e) { /* ignore */ }
+        }
+
+        // Initialize backup options – element-based ops inside the function itself will guard
+        try { this.updateBackupOptions(); } catch (e) { /* ignore */ }
+
+        // Warten auf die optionalen Tasks kurz (nicht zwingend erforderlich)
+        try { await Promise.allSettled(tasks); } catch (e) { /* ignore */ }
     },
 
     async checkServerConnection() {
@@ -823,6 +831,18 @@ const SharedModule = {
         }
     }
 };
+
+// Ensure tab definitions are available immediately so the sidebar can render them
+if (typeof App !== 'undefined' && typeof App.registerTabs === 'function') {
+    App.registerTabs('shared', [
+        { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+        { id: 'transactions', label: 'Transaktionen', icon: '💳' },
+        { id: 'accounts', label: 'Konten', icon: '📁' },
+        { id: 'invoices', label: 'Rechnungen', icon: '📄' },
+        { id: 'youtube', label: 'YouTube', icon: '📺' },
+        { id: 'backup', label: 'Backup', icon: '💾' }
+    ]);
+}
 
 // Auto-init wenn Modul aktiv wird
 if (document.getElementById('module-shared').classList.contains('active')) {

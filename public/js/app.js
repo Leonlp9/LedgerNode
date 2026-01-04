@@ -207,6 +207,8 @@ const App = {
         // ist, aber noch keine Daten geladen wurden.
         await this.initModule(moduleName);
 
+        console.debug('App.switchModule: tabs for module after init', moduleName, this.tabs[moduleName]);
+
         // Update tabs for the new module
         this.updateTabs();
         
@@ -246,6 +248,7 @@ const App = {
         tabNav.innerHTML = moduleTabs.map(tab => `
             <a href="#" 
                class="nav-item ${tab.id === this.currentTab[this.currentModule] ? 'active' : ''}" 
+               data-module="${this.currentModule}"
                data-tab="${tab.id}"
                onclick="App.switchTab('${this.currentModule}', '${tab.id}'); return false;">
                 <span class="nav-icon">${tab.icon}</span>
@@ -262,13 +265,18 @@ const App = {
      */
     async switchTab(moduleName, tabId) {
         if (moduleName !== this.currentModule) {
-            console.warn('Cannot switch tab for inactive module:', moduleName);
+            // Wenn ein Tab-Click auf ein anderes Modul zielt,
+            // merke das gewünschte Tab und wechsle zuerst das Modul.
+            // switchModule kümmert sich danach darum, das in `this.currentTab` gesetzte Tab anzuzeigen.
+            console.debug('App.switchTab: requested tab for inactive module, remembering tab and switching module', moduleName, tabId);
+            this.currentTab[moduleName] = tabId;
+            await this.switchModule(moduleName);
             return;
         }
 
         // Hide all tabs in the current module
         const moduleContainer = document.getElementById(`module-${moduleName}`);
-        if (!moduleContainer) return;
+        if (!moduleContainer) return console.warn('App.switchTab: module container not found', moduleName);
 
         const allTabs = moduleContainer.querySelectorAll('.tab-content');
         allTabs.forEach(tab => {
@@ -276,7 +284,9 @@ const App = {
         });
 
         // Show the selected tab
-        const selectedTab = document.getElementById(`${moduleName}-tab-${tabId}`);
+        const selectedId = `${moduleName}-tab-${tabId}`;
+        const selectedTab = document.getElementById(selectedId);
+        console.debug('App.switchTab ->', { moduleName, tabId, selectedId, selectedTabExists: !!selectedTab });
         if (selectedTab) {
             selectedTab.style.display = 'block';
             this.currentTab[moduleName] = tabId;
@@ -312,6 +322,8 @@ const App = {
             } catch (e) {
                 console.error('Error while auto-loading tab data', e);
             }
+        } else {
+            console.warn('App.switchTab: selected tab element not found', selectedId);
         }
     },
 

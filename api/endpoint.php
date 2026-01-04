@@ -12,6 +12,24 @@ use App\Api\Server;
 use App\Core\Config;
 use App\Core\Database;
 
+// Quick CORS preflight helper: send permissive headers early so OPTIONS/preflight gets a response
+if (isset($_SERVER['HTTP_ORIGIN'])) {
+    $preOrigin = $_SERVER['HTTP_ORIGIN'];
+    header('Access-Control-Allow-Origin: ' . $preOrigin);
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    $preHeaders = 'X-API-Key, Content-Type, Authorization';
+    if (!empty($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {
+        $preHeaders = $preHeaders . ', ' . $_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'];
+    }
+    header('Access-Control-Allow-Headers: ' . $preHeaders);
+    header('Vary: Origin');
+    header('Access-Control-Allow-Credentials: true');
+}
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
 // CORS: dynamische Allowlist (für Produktion bitte in Konfiguration auslagern)
 $allowedOrigins = [
     'http://localhost',
@@ -78,9 +96,18 @@ if ($origin && in_array($origin, $allowedOrigins, true)) {
     }
 }
 
-if ($allow) {
-    // Setze Origin exakt (nicht '*') — wichtig wenn Credentials verwendet werden
-    header('Access-Control-Allow-Origin: ' . $origin);
+// Erlaube in DEV/DEBUG-Fällen breitere CORS-Rules damit localhost-Clients arbeiten können
+$debugMode = false;
+try {
+    $debugMode = \App\Core\Config::get('APP.debug', false);
+} catch (\Throwable $e) {
+    // ignore
+}
+
+if ($allow || $debugMode) {
+    // Setze Origin exakt (nicht '*') wenn vorhanden, ansonsten wildcard (nur für Debug/Dev)
+    $acOrigin = $origin ? $origin : '*';
+    header('Access-Control-Allow-Origin: ' . $acOrigin);
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 
     // Erlaube typische Header; wenn dein Client spezielle Header sendet, ergänze diese
@@ -91,11 +118,13 @@ if ($allow) {
     }
     header('Access-Control-Allow-Headers: ' . $allowedHeaders);
 
+    // Wenn wir eine konkrete Origin zurückgeben, erlauben wir auch Credentials (nur bei konkreter Origin)
+    if ($acOrigin !== '*') {
+        header('Access-Control-Allow-Credentials: true');
+    }
+
     // Wichtige Caching-Anweisung: Antwort kann je nach Origin variieren
     header('Vary: Origin');
-
-    // Falls der Client Cookies / Credentials sendet, aktiviere dies (TODO: nur aktivieren wenn benötigt)
-    // header('Access-Control-Allow-Credentials: true');
 } else {
     // Kein erlaubter Origin — sende keine CORS-Header (Browser blockiert dann den Request)
 }
