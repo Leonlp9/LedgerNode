@@ -39,6 +39,21 @@ $allowedOrigins = [
 ];
 $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
 
+// --- ALWAYS ALLOW LOCALHOST / LOOPBACK ORIGINS ----------------------------
+// Some dev setups use ports or IPv6 loopback not covered by a static allowlist.
+// Erkenne robust localhost- und loopback-Origins und markiere sie als erlaubt.
+if ($origin) {
+    $parsedHost = parse_url($origin, PHP_URL_HOST) ?: '';
+    // handle cases like 'http://localhost:3000', 'http://127.0.0.1:8000', 'http://[::1]'
+    if ($parsedHost === 'localhost' || $parsedHost === '127.0.0.1' || $parsedHost === '::1' || $parsedHost === '[::1]') {
+        $allow = true;
+    }
+    // Also allow origins that contain 'localhost' (covers unusual formats)
+    if (!$allow && stripos($origin, 'localhost') !== false) {
+        $allow = true;
+    }
+}
+
 // Hilfsfunktion: prüfe ob eine IPv4-Adresse in RFC1918 / Loopback Bereich liegt
 $ipIsPrivate = function(string $ip): bool {
     if (!filter_var($ip, FILTER_VALIDATE_IP)) return false;
@@ -69,6 +84,15 @@ $ipIsPrivate = function(string $ip): bool {
 };
 
 $allow = false;
+
+// Immer localhost / loopback erlauben (Ports/Varianten abdecken)
+if ($origin) {
+    $parsedHost = parse_url($origin, PHP_URL_HOST) ?: '';
+    if ($parsedHost === 'localhost' || $parsedHost === '127.0.0.1' || $parsedHost === '::1' || $parsedHost === '[::1]' || stripos($origin, 'localhost') !== false) {
+        $allow = true;
+    }
+}
+
 if ($origin && in_array($origin, $allowedOrigins, true)) {
     $allow = true;
 } elseif ($origin) {
@@ -127,6 +151,7 @@ if ($allow || $debugMode) {
     header('Vary: Origin');
 } else {
     // Kein erlaubter Origin — sende keine CORS-Header (Browser blockiert dann den Request)
+    ; // intentional no-op to satisfy static analyzers
 }
 
 // Preflight-Request (OPTIONS) vor weiterer Logik beantworten
