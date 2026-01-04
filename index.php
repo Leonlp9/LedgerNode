@@ -37,12 +37,16 @@ require_once $vendorAutoload;
 
 use App\Core\Config;
 use App\Core\Security;
+use App\Database\SchemaManager;
 
 // Versuche die Konfiguration früh zu laden und fange Fehler ab, damit der Anwender
 // eine aussagekräftige, freundlich formatierte Fehlermeldung im Browser sieht.
 try {
     // Diese Methode initialisiert und validiert die Konfiguration
     Config::getInstance();
+
+    // Initialisiere Datenbank-Schema (erstellt Tabellen falls nötig)
+    SchemaManager::init();
 } catch (\Throwable $e) {
     // Technische Details in temporäres Log schreiben (nur für Admins lesbar auf dem Server)
     $logFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'ledger_error.log';

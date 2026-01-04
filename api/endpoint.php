@@ -11,6 +11,10 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use App\Api\Server;
 use App\Core\Config;
 use App\Core\Database;
+use App\Database\SchemaManager;
+
+// Initialisiere Datenbank-Schema (erstellt Tabellen falls nötig)
+SchemaManager::init();
 
 // CORS komplett deaktiviert - erlaube ALLE Origins (für Development)
 header('Access-Control-Allow-Origin: *');

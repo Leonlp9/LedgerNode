@@ -10,6 +10,10 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use App\Core\Database;
 use App\Core\Config;
 use App\Api\PrivateInvoices;
+use App\Database\SchemaManager;
+
+// Initialisiere Datenbank-Schema (erstellt Tabellen falls nötig)
+SchemaManager::init();
 
 // Set JSON header
 header('Content-Type: application/json');
