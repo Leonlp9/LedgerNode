@@ -12,157 +12,19 @@ use App\Api\Server;
 use App\Core\Config;
 use App\Core\Database;
 
-// Quick CORS preflight helper: send permissive headers early so OPTIONS/preflight gets a response
-if (isset($_SERVER['HTTP_ORIGIN'])) {
-    $preOrigin = $_SERVER['HTTP_ORIGIN'];
-    // Immer localhost-Origins erlauben (auch mit Ports)
-    $parsedPreHost = parse_url($preOrigin, PHP_URL_HOST);
-    $allowPre = false;
-    if ($parsedPreHost === 'localhost' || $parsedPreHost === '127.0.0.1' || $parsedPreHost === '::1' || $parsedPreHost === '[::1]' || stripos($preOrigin, 'localhost') !== false) {
-        $allowPre = true;
-    }
-    // Auch andere erlaubte Origins
-    $allowedOriginsQuick = ['http://localhost', 'http://localhost:3000', 'http://127.0.0.1', 'http://127.0.0.1:8000'];
-    if (in_array($preOrigin, $allowedOriginsQuick, true)) {
-        $allowPre = true;
-    }
+// CORS komplett deaktiviert - erlaube ALLE Origins (für Development)
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: X-API-Key, Content-Type, Authorization, X-Requested-With');
 
-    if ($allowPre) {
-        header('Access-Control-Allow-Origin: ' . $preOrigin);
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        $preHeaders = 'X-API-Key, Content-Type, Authorization';
-        if (!empty($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {
-            $preHeaders = $preHeaders . ', ' . $_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'];
-        }
-        header('Access-Control-Allow-Headers: ' . $preHeaders);
-        header('Vary: Origin');
-        header('Access-Control-Allow-Credentials: true');
-    }
-}
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
 
-// CORS: dynamische Allowlist (für Produktion bitte in Konfiguration auslagern)
-$allowedOrigins = [
-    'http://localhost',
-    'http://localhost:3000',
-    'http://127.0.0.1',
-    'http://127.0.0.1:8000'
-];
-$origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
-
-
-// Hilfsfunktion: prüfe ob eine IPv4-Adresse in RFC1918 / Loopback Bereich liegt
-$ipIsPrivate = function(string $ip): bool {
-    if (!filter_var($ip, FILTER_VALIDATE_IP)) return false;
-    if (strpos($ip, ':') !== false) {
-        // einfache IPv6-Prüfung: loopback ::1 und ULA fc00::/7
-        if ($ip === '::1') return true;
-        $first = strtolower(explode(':', $ip)[0]);
-        if (strpos($first, 'fc') === 0 || strpos($first, 'fd') === 0) return true;
-        return false;
-    }
-
-    $long = ip2long($ip);
-    if ($long === false) return false;
-
-    $ranges = [
-        ['10.0.0.0', '10.255.255.255'],
-        ['172.16.0.0', '172.31.255.255'],
-        ['192.168.0.0', '192.168.255.255'],
-        ['127.0.0.0', '127.255.255.255']
-    ];
-
-    foreach ($ranges as $r) {
-        if ($long >= ip2long($r[0]) && $long <= ip2long($r[1])) {
-            return true;
-        }
-    }
-    return false;
-};
-
-$allow = false;
-
-// Immer localhost / loopback erlauben (Ports/Varianten abdecken)
-if ($origin) {
-    $parsedHost = parse_url($origin, PHP_URL_HOST) ?: '';
-    // Erlaube localhost, 127.0.0.1, ::1 und alle Varianten
-    if ($parsedHost === 'localhost' || $parsedHost === '127.0.0.1' || $parsedHost === '::1' || $parsedHost === '[::1]' || stripos($origin, 'localhost') !== false) {
-        $allow = true;
-    }
-}
-
-if ($origin && in_array($origin, $allowedOrigins, true)) {
-    $allow = true;
-} elseif ($origin) {
-    // Versuche Host aus Origin zu parsen
-    $host = parse_url($origin, PHP_URL_HOST);
-    if ($host !== null) {
-        // Direkte Hostnamen wie 'localhost', '127.0.0.1', '::1'
-        if (in_array(strtolower($host), ['localhost', '127.0.0.1', '::1', '[::1]'], true)) {
-            $allow = true;
-        } else {
-            // Falls Host eine IP ist oder sich auflösen lässt, prüfe privaten Bereich
-            $resolved = $host;
-            if (!filter_var($host, FILTER_VALIDATE_IP)) {
-                // Versuche DNS-Auflösung (still, ohne Fehler)
-                $resolved = gethostbyname($host);
-            }
-            if ($resolved && $resolved !== $host && filter_var($resolved, FILTER_VALIDATE_IP)) {
-                if ($ipIsPrivate($resolved)) {
-                    $allow = true;
-                }
-            } elseif (filter_var($host, FILTER_VALIDATE_IP) && $ipIsPrivate($host)) {
-                $allow = true;
-            }
-        }
-    }
-}
-
-// Erlaube in DEV/DEBUG-Fällen breitere CORS-Rules damit localhost-Clients arbeiten können
-// WICHTIG: Wenn kein Debug-Mode explizit definiert ist, erlauben wir dennoch CORS für Entwicklung
-$debugMode = true; // Standardmäßig permissiv für Entwicklung
-try {
-    $debugMode = \App\Core\Config::get('APP.debug', true);
-} catch (\Throwable $e) {
-    // Config noch nicht verfügbar - bleibe permissiv
-    $debugMode = true;
-}
-
-if ($allow || $debugMode) {
-    // Setze Origin exakt (nicht '*') wenn vorhanden, ansonsten wildcard (nur für Debug/Dev)
-    $acOrigin = $origin ? $origin : '*';
-    header('Access-Control-Allow-Origin: ' . $acOrigin);
-    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-
-    // Erlaube typische Header; wenn dein Client spezielle Header sendet, ergänze diese
-    $allowedHeaders = 'X-API-Key, Content-Type, Authorization';
-    // Falls ein Preflight spezielle Request-Headers anfragt, nimm sie mit auf (sicherer für Browser-Clients)
-    if (!empty($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {
-        $allowedHeaders = $allowedHeaders . ', ' . $_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'];
-    }
-    header('Access-Control-Allow-Headers: ' . $allowedHeaders);
-
-    // Wenn wir eine konkrete Origin zurückgeben, erlauben wir auch Credentials (nur bei konkreter Origin)
-    if ($acOrigin !== '*') {
-        header('Access-Control-Allow-Credentials: true');
-    }
-
-    // Wichtige Caching-Anweisung: Antwort kann je nach Origin variieren
-    header('Vary: Origin');
-} else {
-    // Kein erlaubter Origin — sende keine CORS-Header (Browser blockiert dann den Request)
-    ; // intentional no-op to satisfy static analyzers
-}
-
-// Preflight-Request (OPTIONS) vor weiterer Logik beantworten
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    // Preflights benötigen normalerweise keinen Body; 204 ist passend
-    http_response_code(204);
-    exit;
-}
+// CORS ist jetzt komplett deaktiviert (siehe Header oben)
+$allow = true;
+$debugMode = true;
 
 // --- PROXY-Handler für Client-to-Server-API-Weiterleitung (nur für localhost/Debug) ---
 // WICHTIG: Dieser Handler muss VOR allen anderen Handlern kommen, damit er Proxy-Requests abfängt
@@ -284,37 +146,8 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
     throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
 });
 
-set_exception_handler(function($exception) use ($origin, $ipIsPrivate, $allowedOrigins) {
-    // Falls Origin vorhanden und privat/erlaubt, sende die gleichen CORS-Header wie im normalen Pfad
-    $allowEx = false;
-    if ($origin && in_array($origin, $allowedOrigins, true)) {
-        $allowEx = true;
-    } elseif ($origin) {
-        $host = parse_url($origin, PHP_URL_HOST);
-        if ($host !== null) {
-            if (in_array(strtolower($host), ['localhost'], true)) {
-                $allowEx = true;
-            } else {
-                $resolved = $host;
-                if (!filter_var($host, FILTER_VALIDATE_IP)) {
-                    $resolved = gethostbyname($host);
-                }
-                if ($resolved && $resolved !== $host && filter_var($resolved, FILTER_VALIDATE_IP) && $ipIsPrivate($resolved)) {
-                    $allowEx = true;
-                } elseif (filter_var($host, FILTER_VALIDATE_IP) && $ipIsPrivate($host)) {
-                    $allowEx = true;
-                }
-            }
-        }
-    }
-
-    if ($allowEx) {
-        header('Access-Control-Allow-Origin: ' . $origin);
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: X-API-Key, Content-Type, Authorization');
-        header('Vary: Origin');
-    }
-
+set_exception_handler(function($exception) {
+    // CORS-Header sind bereits ganz oben gesetzt (Access-Control-Allow-Origin: *)
     http_response_code(500);
     header('Content-Type: application/json');
     
@@ -324,13 +157,17 @@ set_exception_handler(function($exception) use ($origin, $ipIsPrivate, $allowedO
     ];
     
     // Zeige Details nur im Debug-Modus
-    if (Config::get('APP.debug', false)) {
-        $response['debug'] = [
-            'message' => $exception->getMessage(),
-            'file' => $exception->getFile(),
-            'line' => $exception->getLine(),
-            'trace' => $exception->getTraceAsString()
-        ];
+    try {
+        if (Config::get('APP.debug', false)) {
+            $response['debug'] = [
+                'message' => $exception->getMessage(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+                'trace' => $exception->getTraceAsString()
+            ];
+        }
+    } catch (\Throwable $e) {
+        // Config nicht verfügbar, zeige keine Debug-Infos
     }
     
     echo json_encode($response);
@@ -373,10 +210,6 @@ if (strpos($reqPath, '/api/private.php') === 0 && !Config::isServer()) {
         }
     }
 
-    // Enable DEBUG for local requests so private.php returns detailed errors during development
-    if (!defined('DEBUG') && isset($_SERVER['REMOTE_ADDR']) && $ipIsPrivate($_SERVER['REMOTE_ADDR'])) {
-        define('DEBUG', true);
-    }
 
     // api/private.php prüft selbst Config::isServer und sendet die passende Response
     require_once __DIR__ . '/private.php';
