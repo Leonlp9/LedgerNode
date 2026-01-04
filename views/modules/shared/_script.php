@@ -69,12 +69,13 @@ const SharedModule = {
             const stats = await API.getShared('getSharedStats');
             
             if (stats) {
-                document.getElementById('shared-balance').textContent = 
-                    this.formatCurrency(stats.balance || 0);
-                document.getElementById('shared-income').textContent = 
-                    this.formatCurrency(stats.total_income || 0);
-                document.getElementById('shared-expenses').textContent = 
-                    this.formatCurrency(stats.total_expenses || 0);
+                const balanceEl = document.getElementById('shared-balance');
+                const incomeEl = document.getElementById('shared-income');
+                const expensesEl = document.getElementById('shared-expenses');
+
+                if (balanceEl) balanceEl.textContent = this.formatCurrency(stats.balance || 0);
+                if (incomeEl) incomeEl.textContent = this.formatCurrency(stats.total_income || 0);
+                if (expensesEl) expensesEl.textContent = this.formatCurrency(stats.total_expenses || 0);
             }
         } catch (error) {
             console.error('Fehler beim Laden der Stats:', error);
@@ -205,6 +206,7 @@ const SharedModule = {
 
     async loadTransactions() {
         const container = document.getElementById('shared-transactions-list');
+        if (!container) return;
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
         try {
@@ -256,12 +258,15 @@ const SharedModule = {
     },
 
     showAddTransaction() {
-        document.getElementById('shared-transaction-modal').style.display = 'flex';
+        const modal = document.getElementById('shared-transaction-modal');
+        if (modal) modal.style.display = 'flex';
     },
 
     closeModal() {
-        document.getElementById('shared-transaction-modal').style.display = 'none';
-        document.getElementById('shared-transaction-form').reset();
+        const modal = document.getElementById('shared-transaction-modal');
+        const form = document.getElementById('shared-transaction-form');
+        if (modal) modal.style.display = 'none';
+        if (form) form.reset();
     },
 
     async submitTransaction(event) {
@@ -323,6 +328,7 @@ const SharedModule = {
 
     async loadAccountsManagement() {
         const container = document.getElementById('shared-accounts-management');
+        if (!container) return;
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
         try {
@@ -377,17 +383,27 @@ const SharedModule = {
     },
 
     showAddAccount() {
-        document.getElementById('shared-account-modal-title').textContent = 'Neues gemeinsames Konto';
-        document.getElementById('shared-acc-id').value = '';
-        document.getElementById('shared-acc-name').value = '';
-        document.getElementById('shared-account-modal').style.display = 'flex';
+        const titleEl = document.getElementById('shared-account-modal-title');
+        const idEl = document.getElementById('shared-acc-id');
+        const nameEl = document.getElementById('shared-acc-name');
+        const modal = document.getElementById('shared-account-modal');
+
+        if (titleEl) titleEl.textContent = 'Neues gemeinsames Konto';
+        if (idEl) idEl.value = '';
+        if (nameEl) nameEl.value = '';
+        if (modal) modal.style.display = 'flex';
     },
 
     editAccount(id, name) {
-        document.getElementById('shared-account-modal-title').textContent = 'Konto bearbeiten';
-        document.getElementById('shared-acc-id').value = id;
-        document.getElementById('shared-acc-name').value = name;
-        document.getElementById('shared-account-modal').style.display = 'flex';
+        const titleEl = document.getElementById('shared-account-modal-title');
+        const idEl = document.getElementById('shared-acc-id');
+        const nameEl = document.getElementById('shared-acc-name');
+        const modal = document.getElementById('shared-account-modal');
+
+        if (titleEl) titleEl.textContent = 'Konto bearbeiten';
+        if (idEl) idEl.value = id;
+        if (nameEl) nameEl.value = name;
+        if (modal) modal.style.display = 'flex';
     },
 
     async editAccountById(id) {
@@ -408,8 +424,10 @@ const SharedModule = {
     },
 
     closeAccountModal() {
-        document.getElementById('shared-account-modal').style.display = 'none';
-        document.getElementById('shared-account-form').reset();
+        const modal = document.getElementById('shared-account-modal');
+        const form = document.getElementById('shared-account-form');
+        if (modal) modal.style.display = 'none';
+        if (form) form.reset();
     },
 
     async submitAccount(event) {
@@ -501,12 +519,15 @@ const SharedModule = {
     switchYouTubeSubtab(subtab) {
         this.youtubeState.currentSubtab = subtab;
         
+        const incomeSection = document.getElementById('youtube-income-section');
+        const expensesSection = document.getElementById('youtube-expenses-section');
+
         if (subtab === 'income') {
-            document.getElementById('youtube-income-section').style.display = 'block';
-            document.getElementById('youtube-expenses-section').style.display = 'none';
+            if (incomeSection) incomeSection.style.display = 'block';
+            if (expensesSection) expensesSection.style.display = 'none';
         } else {
-            document.getElementById('youtube-income-section').style.display = 'none';
-            document.getElementById('youtube-expenses-section').style.display = 'block';
+            if (incomeSection) incomeSection.style.display = 'none';
+            if (expensesSection) expensesSection.style.display = 'block';
         }
         
         // Update active button
@@ -528,6 +549,7 @@ const SharedModule = {
 
     async loadYouTubeIncome() {
         const container = document.getElementById('youtube-income-list');
+        if (!container) return;
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
         try {
@@ -595,6 +617,7 @@ const SharedModule = {
 
     async loadYouTubeExpenses() {
         const container = document.getElementById('youtube-expenses-list');
+        if (!container) return;
         container.innerHTML = '<div class="loading">Lädt...</div>';
 
         try {
@@ -647,15 +670,22 @@ const SharedModule = {
 
     showAddYouTubeIncome() {
         const now = new Date();
-        document.getElementById('yt-income-year').value = now.getFullYear();
-        document.getElementById('yt-income-month').value = now.getMonth() + 1;
-        document.getElementById('yt-income-id').value = '';
-        document.getElementById('youtube-income-form').reset();
-        document.getElementById('youtube-income-modal').style.display = 'flex';
+        const yearEl = document.getElementById('yt-income-year');
+        const monthEl = document.getElementById('yt-income-month');
+        const idEl = document.getElementById('yt-income-id');
+        const formEl = document.getElementById('youtube-income-form');
+        const modalEl = document.getElementById('youtube-income-modal');
+
+        if (yearEl) yearEl.value = now.getFullYear();
+        if (monthEl) monthEl.value = now.getMonth() + 1;
+        if (idEl) idEl.value = '';
+        if (formEl) formEl.reset();
+        if (modalEl) modalEl.style.display = 'flex';
     },
 
     closeYouTubeIncomeModal() {
-        document.getElementById('youtube-income-modal').style.display = 'none';
+        const modal = document.getElementById('youtube-income-modal');
+        if (modal) modal.style.display = 'none';
     },
 
     async submitYouTubeIncome(event) {
@@ -701,30 +731,45 @@ const SharedModule = {
             }
             
             // Populate form
-            document.getElementById('yt-income-id').value = income.id;
-            document.getElementById('yt-income-year').value = income.year;
-            document.getElementById('yt-income-month').value = income.month;
-            document.getElementById('yt-income-total').value = income.total_revenue;
-            document.getElementById('yt-income-donations').value = income.donations || 0;
-            document.getElementById('yt-income-members').value = income.members || 0;
-            document.getElementById('yt-income-notes').value = income.notes || '';
-            
+            const idEl = document.getElementById('yt-income-id');
+            const yearEl = document.getElementById('yt-income-year');
+            const monthEl = document.getElementById('yt-income-month');
+            const totalEl = document.getElementById('yt-income-total');
+            const donationsEl = document.getElementById('yt-income-donations');
+            const membersEl = document.getElementById('yt-income-members');
+            const notesEl = document.getElementById('yt-income-notes');
+            const modalEl = document.getElementById('youtube-income-modal');
+
+            if (idEl) idEl.value = income.id;
+            if (yearEl) yearEl.value = income.year;
+            if (monthEl) monthEl.value = income.month;
+            if (totalEl) totalEl.value = income.total_revenue;
+            if (donationsEl) donationsEl.value = income.donations || 0;
+            if (membersEl) membersEl.value = income.members || 0;
+            if (notesEl) notesEl.value = income.notes || '';
+
             // Show modal
-            document.getElementById('youtube-income-modal').style.display = 'flex';
+            if (modalEl) modalEl.style.display = 'flex';
         } catch (error) {
             App.showToast('Fehler beim Laden', 'error');
         }
     },
 
     showAddYouTubeExpense() {
-        document.getElementById('yt-expense-date').valueAsDate = new Date();
-        document.getElementById('yt-expense-id').value = '';
-        document.getElementById('youtube-expense-form').reset();
-        document.getElementById('youtube-expense-modal').style.display = 'flex';
+        const dateEl = document.getElementById('yt-expense-date');
+        const idEl = document.getElementById('yt-expense-id');
+        const formEl = document.getElementById('youtube-expense-form');
+        const modalEl = document.getElementById('youtube-expense-modal');
+
+        if (dateEl) dateEl.valueAsDate = new Date();
+        if (idEl) idEl.value = '';
+        if (formEl) formEl.reset();
+        if (modalEl) modalEl.style.display = 'flex';
     },
 
     closeYouTubeExpenseModal() {
-        document.getElementById('youtube-expense-modal').style.display = 'none';
+        const modal = document.getElementById('youtube-expense-modal');
+        if (modal) modal.style.display = 'none';
     },
 
     async submitYouTubeExpense(event) {
@@ -760,24 +805,30 @@ const SharedModule = {
     // ========== Backup Functions ==========
 
     updateBackupOptions() {
-        const period = document.getElementById('shared-backup-period').value;
+        const periodEl = document.getElementById('shared-backup-period');
+        if (!periodEl) return;
+
+        const period = periodEl.value;
         const monthOptions = document.getElementById('shared-backup-month-options');
         const yearOptions = document.getElementById('shared-backup-year-options');
         
         const now = new Date();
         
         if (period === 'month') {
-            monthOptions.style.display = 'block';
-            yearOptions.style.display = 'none';
-            document.getElementById('shared-backup-year').value = now.getFullYear();
-            document.getElementById('shared-backup-month').value = now.getMonth() + 1;
+            if (monthOptions) monthOptions.style.display = 'block';
+            if (yearOptions) yearOptions.style.display = 'none';
+            const yearEl = document.getElementById('shared-backup-year');
+            const monthEl = document.getElementById('shared-backup-month');
+            if (yearEl) yearEl.value = now.getFullYear();
+            if (monthEl) monthEl.value = now.getMonth() + 1;
         } else if (period === 'year') {
-            monthOptions.style.display = 'none';
-            yearOptions.style.display = 'block';
-            document.getElementById('shared-backup-year-only').value = now.getFullYear();
+            if (monthOptions) monthOptions.style.display = 'none';
+            if (yearOptions) yearOptions.style.display = 'block';
+            const yearOnlyEl = document.getElementById('shared-backup-year-only');
+            if (yearOnlyEl) yearOnlyEl.value = now.getFullYear();
         } else {
-            monthOptions.style.display = 'none';
-            yearOptions.style.display = 'none';
+            if (monthOptions) monthOptions.style.display = 'none';
+            if (yearOptions) yearOptions.style.display = 'none';
         }
     },
 
@@ -789,7 +840,8 @@ const SharedModule = {
         const data = Object.fromEntries(formData);
         
         // Show loading state
-        document.getElementById('shared-backup-loading').style.display = 'block';
+        const loadingEl = document.getElementById('shared-backup-loading');
+        if (loadingEl) loadingEl.style.display = 'block';
         form.style.display = 'none';
         
         try {
@@ -826,7 +878,8 @@ const SharedModule = {
             App.showToast('Fehler beim Erstellen des Backups: ' + (error.message || 'Unbekannter Fehler'), 'error');
         } finally {
             // Hide loading state
-            document.getElementById('shared-backup-loading').style.display = 'none';
+            const loadingEl = document.getElementById('shared-backup-loading');
+            if (loadingEl) loadingEl.style.display = 'none';
             form.style.display = 'block';
         }
     }

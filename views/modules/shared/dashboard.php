@@ -1,17 +1,17 @@
-    <!-- Tab: Dashboard -->
-    <div class="tab-content" id="shared-tab-dashboard">
-        <div class="module-header">
-            <h2>Dashboard</h2>
-            <p class="subtitle">Zentral verwaltete Finanzen</p>
-            <?php if (\App\Core\Config::isClient()): ?>
-                <div class="sync-status" id="sync-status">
-                    <span class="status-indicator"></span>
-                    <span>Verbunden mit Server</span>
-                </div>
-            <?php endif; ?>
-        </div>
+<!-- Tab: Dashboard -->
+<div class="tab-content" id="shared-tab-dashboard">
+    <div class="module-header">
+        <h2>Dashboard</h2>
+        <p class="subtitle">Zentral verwaltete Finanzen</p>
+        <?php if (\App\Core\Config::isClient()): ?>
+            <div class="sync-status" id="sync-status">
+                <span class="status-indicator"></span>
+                <span>Verbunden mit Server</span>
+            </div>
+        <?php endif; ?>
+    </div>
 
-        <!-- Dashboard Cards -->
+    <!-- Dashboard Cards -->
     <div class="dashboard-grid">
         <div class="card">
             <div class="card-header">
@@ -88,4 +88,4 @@
             </div>
         </div>
     </div>
-
+</div>
